@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -44,6 +44,33 @@ export type Database = {
           phone?: string | null
           price_group?: Database["public"]["Enums"]["customer_price_group"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      price_group_audit: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          customer_id: string
+          id: number
+          new_price_group: Database["public"]["Enums"]["customer_price_group"]
+          old_price_group: Database["public"]["Enums"]["customer_price_group"]
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          customer_id: string
+          id?: never
+          new_price_group: Database["public"]["Enums"]["customer_price_group"]
+          old_price_group: Database["public"]["Enums"]["customer_price_group"]
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          customer_id?: string
+          id?: never
+          new_price_group?: Database["public"]["Enums"]["customer_price_group"]
+          old_price_group?: Database["public"]["Enums"]["customer_price_group"]
         }
         Relationships: []
       }
@@ -149,6 +176,13 @@ export type Database = {
           sku: string
           stock: number
         }[]
+      }
+      set_customer_price_group: {
+        Args: {
+          new_price_group: Database["public"]["Enums"]["customer_price_group"]
+          target_customer_id: string
+        }
+        Returns: Database["public"]["Enums"]["customer_price_group"]
       }
     }
     Enums: {
