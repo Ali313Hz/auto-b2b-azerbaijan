@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { logout } from "./actions";
 
 export default async function AccountPage() {
   const supabase = await createClient();
@@ -37,6 +38,15 @@ export default async function AccountPage() {
         <p>Qiymət qrupu: {profile.price_group}</p>
         <p>Status: {profile.active ? "Aktiv" : "Deaktiv"}</p>
       </div>
+
+      <form action={logout} className="mt-8">
+        <button
+          type="submit"
+          className="rounded-lg bg-zinc-900 px-4 py-2 text-white"
+        >
+          Çıxış
+        </button>
+      </form>
     </main>
   );
 }
