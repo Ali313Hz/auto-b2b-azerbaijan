@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { addToCart } from "./actions";
 
 export default async function ProductsPage() {
   const supabase = await createClient();
@@ -44,8 +45,19 @@ export default async function ProductsPage() {
               <p className="font-semibold">{product.sku}</p>
               <p className="mt-2">Stok: {product.stock}</p>
               <p className="mt-2 text-xl font-semibold">
-                {product.price} AZN
-              </p>
+  {product.price} AZN
+</p>
+
+<form action={addToCart} className="mt-4">
+  <input type="hidden" name="productId" value={product.id} />
+
+  <button
+    type="submit"
+    className="rounded-lg bg-white px-4 py-2 font-medium text-black"
+  >
+    Sepete ekle
+  </button>
+</form>
             </div>
           ))}
         </div>
