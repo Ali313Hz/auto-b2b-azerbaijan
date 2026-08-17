@@ -243,6 +243,10 @@ export type Database = {
         Args: { p_product_id: string; p_quantity: number }
         Returns: number
       }
+      change_cart_quantity: {
+        Args: { p_delta: number; p_product_id: string }
+        Returns: number
+      }
       get_customer_cart: {
         Args: never
         Returns: {
@@ -263,6 +267,7 @@ export type Database = {
           stock: number
         }[]
       }
+      remove_from_cart: { Args: { p_product_id: string }; Returns: undefined }
       set_customer_price_group: {
         Args: {
           new_price_group: Database["public"]["Enums"]["customer_price_group"]
