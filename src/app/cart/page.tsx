@@ -1,8 +1,13 @@
 import { redirect } from "next/navigation";
+import { changeCartQuantity, removeFromCart } from "./actions";
 
 import { createClient } from "@/lib/supabase/server";
 
+
+
 export default async function CartPage() {
+
+    
   const supabase = await createClient();
 
   const {
@@ -45,6 +50,45 @@ export default async function CartPage() {
               >
                 <p className="font-semibold">{item.sku}</p>
                 <p className="mt-2">Adet: {item.quantity}</p>
+                <div className="mt-4 flex items-center gap-3">
+  <form action={changeCartQuantity}>
+    <input type="hidden" name="productId" value={item.product_id} />
+    <input type="hidden" name="delta" value="-1" />
+
+    <button
+      type="submit"
+      disabled={item.quantity <= 1}
+      className="rounded-lg border border-zinc-700 px-3 py-1 disabled:opacity-40"
+    >
+      −
+    </button>
+  </form>
+
+  <span>{item.quantity}</span>
+
+  <form action={changeCartQuantity}>
+    <input type="hidden" name="productId" value={item.product_id} />
+    <input type="hidden" name="delta" value="1" />
+
+    <button
+      type="submit"
+      className="rounded-lg border border-zinc-700 px-3 py-1"
+    >
+      +
+    </button>
+  </form>
+
+  <form action={removeFromCart}>
+    <input type="hidden" name="productId" value={item.product_id} />
+
+    <button
+      type="submit"
+      className="rounded-lg border border-red-800 px-3 py-1 text-red-400"
+    >
+      Sil
+    </button>
+  </form>
+</div>
                 <p className="mt-2">Birim fiyat: {item.unit_price} AZN</p>
                 <p className="mt-2 font-semibold">
                   Ara toplam: {item.line_total} AZN
@@ -60,4 +104,6 @@ export default async function CartPage() {
       )}
     </main>
   );
+
+  
 }
