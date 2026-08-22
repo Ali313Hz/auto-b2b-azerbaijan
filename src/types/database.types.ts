@@ -396,6 +396,15 @@ export type Database = {
         Args: { p_delta: number; p_product_id: string }
         Returns: number
       }
+      create_admin_category: {
+        Args: {
+          p_active: boolean
+          p_name: string
+          p_slug: string
+          p_sort_order: number
+        }
+        Returns: string
+      }
       create_admin_product: {
         Args: {
           p_active: boolean
@@ -415,6 +424,8 @@ export type Database = {
           active: boolean
           id: string
           name: string
+          slug: string
+          sort_order: number
         }[]
       }
       get_admin_customers: {
@@ -492,6 +503,16 @@ export type Database = {
           target_customer_id: string
         }
         Returns: Database["public"]["Enums"]["customer_price_group"]
+      }
+      update_admin_category: {
+        Args: {
+          p_active: boolean
+          p_category_id: string
+          p_name: string
+          p_slug: string
+          p_sort_order: number
+        }
+        Returns: undefined
       }
       update_admin_product: {
         Args: {
