@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
-import { updateProduct } from "./actions";
 
+import { createClient } from "@/lib/supabase/server";
+import {
+  updateProduct,
+  updateProductActive,
+} from "./actions";
 export default async function AdminProductsPage() {
   const supabase = await createClient();
 
@@ -61,6 +64,25 @@ export default async function AdminProductsPage() {
               <p className="mt-2">
                 Durum: {product.active ? "Aktif" : "Deaktif"}
               </p>
+              <form action={updateProductActive} className="mt-3">
+  <input
+    type="hidden"
+    name="productId"
+    value={product.id}
+  />
+  <input
+    type="hidden"
+    name="active"
+    value={product.active ? "false" : "true"}
+  />
+
+  <button
+    type="submit"
+    className="rounded-lg border border-zinc-700 px-4 py-2"
+  >
+    {product.active ? "Deaktif et" : "Aktif et"}
+  </button>
+</form>
 
               <form action={updateProduct} className="mt-5 space-y-4">
                 <input
