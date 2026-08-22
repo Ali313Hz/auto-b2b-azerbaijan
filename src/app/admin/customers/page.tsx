@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-
+import { updateCustomerPriceGroup } from "./actions";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminCustomersPage() {
@@ -60,9 +60,33 @@ export default async function AdminCustomersPage() {
               Telefon: {customer.phone ?? "-"}
             </p>
 
-            <p className="mt-2">
-              Fiyat grubu: {customer.price_group}
-            </p>
+            <form
+  action={updateCustomerPriceGroup}
+  className="mt-4 flex items-center gap-3"
+>
+  <input
+    type="hidden"
+    name="customerId"
+    value={customer.id}
+  />
+
+  <select
+    name="priceGroup"
+    defaultValue={customer.price_group}
+    className="rounded-lg border border-zinc-700 bg-black px-3 py-2"
+  >
+    <option value="NORMAL">NORMAL</option>
+    <option value="DEALER">DEALER</option>
+    <option value="VIP">VIP</option>
+  </select>
+
+  <button
+    type="submit"
+    className="rounded-lg bg-white px-4 py-2 font-medium text-black"
+  >
+    Kaydet
+  </button>
+</form>
 
             <p className="mt-2">
               Durum: {customer.active ? "Aktif" : "Deaktif"}
