@@ -118,6 +118,89 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total: number
+          order_id: string
+          product_id: string
+          quantity: number
+          sku: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total: number
+          order_id: string
+          product_id: string
+          quantity: number
+          sku: string
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total?: number
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          sku?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_group_audit: {
         Row: {
           changed_at: string
@@ -247,6 +330,7 @@ export type Database = {
         Args: { p_delta: number; p_product_id: string }
         Returns: number
       }
+      create_order_from_cart: { Args: never; Returns: string }
       get_customer_cart: {
         Args: never
         Returns: {
@@ -278,6 +362,7 @@ export type Database = {
     }
     Enums: {
       customer_price_group: "NORMAL" | "DEALER" | "VIP"
+      order_status: "PENDING" | "CONFIRMED" | "CANCELLED"
       staff_role:
         | "OWNER"
         | "SALES"
@@ -412,6 +497,7 @@ export const Constants = {
   public: {
     Enums: {
       customer_price_group: ["NORMAL", "DEALER", "VIP"],
+      order_status: ["PENDING", "CONFIRMED", "CANCELLED"],
       staff_role: ["OWNER", "SALES", "PRODUCT_MANAGER", "SUPPORT", "WAREHOUSE"],
     },
   },
