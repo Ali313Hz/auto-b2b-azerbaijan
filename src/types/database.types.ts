@@ -351,6 +351,16 @@ export type Database = {
           stock: number
         }[]
       }
+      get_customer_order_items: {
+        Args: { p_order_id: string }
+        Returns: {
+          line_total: number
+          product_id: string
+          quantity: number
+          sku: string
+          unit_price: number
+        }[]
+      }
       get_customer_orders: {
         Args: never
         Returns: {
