@@ -448,6 +448,16 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["customer_price_group"]
       }
+      update_admin_product: {
+        Args: {
+          p_dealer_price: number
+          p_normal_price: number
+          p_product_id: string
+          p_stock: number
+          p_vip_price: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       customer_price_group: "NORMAL" | "DEALER" | "VIP"
