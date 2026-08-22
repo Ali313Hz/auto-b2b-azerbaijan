@@ -66,3 +66,22 @@ export async function removeFromCart(formData: FormData) {
 
   revalidatePath("/cart");
 }
+export async function createOrder() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { error } = await supabase.rpc("create_order_from_cart");
+
+  if (error) {
+    throw new Error("Sipariş oluşturulamadı.");
+  }
+
+  revalidatePath("/cart");
+}

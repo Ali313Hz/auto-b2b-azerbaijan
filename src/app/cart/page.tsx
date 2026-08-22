@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
-import { changeCartQuantity, removeFromCart } from "./actions";
+import {
+  changeCartQuantity,
+  removeFromCart,
+  createOrder,
+} from "./actions";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -100,6 +104,14 @@ export default async function CartPage() {
           <p className="mt-8 text-2xl font-semibold">
             Toplam: {total.toFixed(2)} AZN
           </p>
+          <form action={createOrder} className="mt-6">
+  <button
+    type="submit"
+    className="rounded-lg bg-white px-5 py-3 font-semibold text-black"
+  >
+    Siparişi oluştur
+  </button>
+</form>
         </>
       )}
     </main>
