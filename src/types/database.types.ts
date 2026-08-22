@@ -384,6 +384,20 @@ export type Database = {
           price_group: Database["public"]["Enums"]["customer_price_group"]
         }[]
       }
+      get_admin_products: {
+        Args: never
+        Returns: {
+          active: boolean
+          category_id: string
+          category_name: string
+          dealer_price: number
+          id: string
+          normal_price: number
+          sku: string
+          stock: number
+          vip_price: number
+        }[]
+      }
       get_customer_cart: {
         Args: never
         Returns: {
