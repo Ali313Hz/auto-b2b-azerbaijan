@@ -396,7 +396,27 @@ export type Database = {
         Args: { p_delta: number; p_product_id: string }
         Returns: number
       }
+      create_admin_product: {
+        Args: {
+          p_active: boolean
+          p_category_id: string
+          p_dealer_price: number
+          p_normal_price: number
+          p_sku: string
+          p_stock: number
+          p_vip_price: number
+        }
+        Returns: string
+      }
       create_order_from_cart: { Args: never; Returns: string }
+      get_admin_categories: {
+        Args: never
+        Returns: {
+          active: boolean
+          id: string
+          name: string
+        }[]
+      }
       get_admin_customers: {
         Args: never
         Returns: {
