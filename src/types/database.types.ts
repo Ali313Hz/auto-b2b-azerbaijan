@@ -372,6 +372,18 @@ export type Database = {
         Returns: number
       }
       create_order_from_cart: { Args: never; Returns: string }
+      get_admin_customers: {
+        Args: never
+        Returns: {
+          active: boolean
+          company_name: string
+          contact_name: string
+          created_at: string
+          id: string
+          phone: string
+          price_group: Database["public"]["Enums"]["customer_price_group"]
+        }[]
+      }
       get_customer_cart: {
         Args: never
         Returns: {
