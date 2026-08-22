@@ -15,15 +15,26 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  if (error) {
+  if (error || !data.user) {
     redirect("/login?error=invalid");
   }
 
+  const { data: staff } = await supabase
+    .from("staff_profiles")
+    .select("role, active")
+    .eq("id", data.user.id)
+    .maybeSingle();
+
   revalidatePath("/", "layout");
+
+  if (staff?.active && staff.role === "OWNER") {
+    redirect("/admin");
+  }
+
   redirect("/account");
 }
