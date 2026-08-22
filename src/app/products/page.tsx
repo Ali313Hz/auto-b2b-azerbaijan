@@ -43,6 +43,9 @@ export default async function ProductsPage() {
               className="rounded-xl border border-zinc-800 p-5"
             >
               <p className="font-semibold">{product.sku}</p>
+              <p className="mt-2 text-sm text-zinc-400">
+  Kategori: {product.category_name ?? "Kategorisiz"}
+</p>
               <p className="mt-2">Stok: {product.stock}</p>
               <p className="mt-2 text-xl font-semibold">
   {product.price} AZN

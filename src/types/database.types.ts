@@ -85,6 +85,36 @@ export type Database = {
           },
         ]
       }
+      categories: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customer_profiles: {
         Row: {
           active: boolean
@@ -266,6 +296,7 @@ export type Database = {
       products: {
         Row: {
           active: boolean
+          category_id: string | null
           created_at: string
           id: string
           sku: string
@@ -274,6 +305,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          category_id?: string | null
           created_at?: string
           id?: string
           sku: string
@@ -282,13 +314,22 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          category_id?: string | null
           created_at?: string
           id?: string
           sku?: string
           stock?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_profiles: {
         Row: {
@@ -345,6 +386,9 @@ export type Database = {
       get_customer_catalog: {
         Args: never
         Returns: {
+          category_id: string
+          category_name: string
+          category_slug: string
           id: string
           price: number
           sku: string
