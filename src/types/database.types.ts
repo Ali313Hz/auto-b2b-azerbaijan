@@ -351,6 +351,15 @@ export type Database = {
           stock: number
         }[]
       }
+      get_customer_orders: {
+        Args: never
+        Returns: {
+          created_at: string
+          order_id: string
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+        }[]
+      }
       remove_from_cart: { Args: { p_product_id: string }; Returns: undefined }
       set_customer_price_group: {
         Args: {
