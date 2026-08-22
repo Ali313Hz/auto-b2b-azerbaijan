@@ -23,10 +23,12 @@ export default async function LoginPage({
         </p>
 
         {params.error && (
-          <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            E-poçt və ya şifrə yanlışdır.
-          </p>
-        )}
+  <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+    {params.error === "inactive"
+      ? "Hesabınız deaktiv edilib. Administratorla əlaqə saxlayın."
+      : "E-poçt və ya şifrə yanlışdır."}
+  </p>
+)}
 
         <form className="mt-6 space-y-4">
           <div>

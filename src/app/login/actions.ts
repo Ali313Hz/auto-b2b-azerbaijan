@@ -36,5 +36,17 @@ export async function login(formData: FormData) {
     redirect("/admin");
   }
 
+  const { data: customer } = await supabase
+    .from("customer_profiles")
+    .select("active")
+    .eq("id", data.user.id)
+    .maybeSingle();
+
+  if (customer && !customer.active) {
+    await supabase.auth.signOut();
+
+    redirect("/login?error=inactive");
+  }
+
   redirect("/account");
 }

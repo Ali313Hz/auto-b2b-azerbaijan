@@ -27,6 +27,9 @@ export default async function AccountPage() {
       </main>
     );
   }
+  if (!profile.active) {
+  redirect("/login?error=inactive");
+}
 
   return (
     <main className="p-8">

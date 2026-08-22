@@ -43,3 +43,42 @@ export async function updateCustomerPriceGroup(formData: FormData) {
   revalidatePath("/account");
   revalidatePath("/products");
 }
+export async function updateCustomerActive(formData: FormData) {
+  const customerId = formData.get("customerId");
+  const activeValue = formData.get("active");
+
+  if (
+    typeof customerId !== "string" ||
+    typeof activeValue !== "string" ||
+    (activeValue !== "true" && activeValue !== "false")
+  ) {
+    throw new Error("Geçersiz müşteri bilgisi.");
+  }
+
+  const active = activeValue === "true";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { error } = await supabase.rpc("set_customer_active", {
+    target_customer_id: customerId,
+    new_active: active,
+  });
+
+  if (error) {
+    throw new Error("Müşteri durumu güncellenemedi.");
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath("/account");
+  revalidatePath("/products");
+  revalidatePath("/cart");
+  revalidatePath("/orders");
+}

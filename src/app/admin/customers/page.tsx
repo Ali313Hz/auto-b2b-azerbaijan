@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { updateCustomerPriceGroup } from "./actions";
+import {
+  updateCustomerActive,
+  updateCustomerPriceGroup,
+} from "./actions";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminCustomersPage() {
@@ -91,6 +94,26 @@ export default async function AdminCustomersPage() {
             <p className="mt-2">
               Durum: {customer.active ? "Aktif" : "Deaktif"}
             </p>
+            <form action={updateCustomerActive} className="mt-3">
+  <input
+    type="hidden"
+    name="customerId"
+    value={customer.id}
+  />
+
+  <input
+    type="hidden"
+    name="active"
+    value={customer.active ? "false" : "true"}
+  />
+
+  <button
+    type="submit"
+    className="rounded-lg border border-zinc-700 px-4 py-2"
+  >
+    {customer.active ? "Deaktif et" : "Aktif et"}
+  </button>
+</form>
           </div>
         ))}
       </div>

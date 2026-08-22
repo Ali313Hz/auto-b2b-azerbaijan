@@ -497,6 +497,10 @@ export type Database = {
         }[]
       }
       remove_from_cart: { Args: { p_product_id: string }; Returns: undefined }
+      set_customer_active: {
+        Args: { new_active: boolean; target_customer_id: string }
+        Returns: boolean
+      }
       set_customer_price_group: {
         Args: {
           new_price_group: Database["public"]["Enums"]["customer_price_group"]
