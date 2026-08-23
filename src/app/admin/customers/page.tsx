@@ -5,6 +5,7 @@ import {
   createCustomer,
   updateCustomerActive,
   updateCustomerPriceGroup,
+  updateCustomerProfile,
 } from "./actions";
 
 export default async function AdminCustomersPage() {
@@ -167,17 +168,62 @@ export default async function AdminCustomersPage() {
               key={customer.id}
               className="rounded-xl border border-zinc-800 p-5"
             >
-              <p className="text-lg font-semibold">
-                {customer.company_name ?? "Şirket adı yok"}
-              </p>
+             <form
+  action={updateCustomerProfile}
+  className="space-y-4"
+>
+  <input
+    type="hidden"
+    name="customerId"
+    value={customer.id}
+  />
 
-              <p className="mt-2">
-                Yetkili: {customer.contact_name ?? "-"}
-              </p>
+  <div>
+    <label className="block text-sm">
+      Şirket adı
+    </label>
 
-              <p className="mt-2">
-                Telefon: {customer.phone ?? "-"}
-              </p>
+    <input
+      name="companyName"
+      required
+      defaultValue={customer.company_name ?? ""}
+      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+    />
+  </div>
+
+  <div>
+    <label className="block text-sm">
+      Yetkili kişi
+    </label>
+
+    <input
+      name="contactName"
+      required
+      defaultValue={customer.contact_name ?? ""}
+      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+    />
+  </div>
+
+  <div>
+    <label className="block text-sm">
+      Telefon
+    </label>
+
+    <input
+      type="tel"
+      name="phone"
+      defaultValue={customer.phone ?? ""}
+      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+    />
+  </div>
+
+  <button
+    type="submit"
+    className="rounded-lg bg-white px-4 py-2 font-medium text-black"
+  >
+    Bilgileri Kaydet
+  </button>
+</form>
 
               <p className="mt-2">
                 Durum: {customer.active ? "Aktif" : "Deaktif"}

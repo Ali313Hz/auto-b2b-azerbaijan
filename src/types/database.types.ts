@@ -518,6 +518,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_admin_customer_profile: {
+        Args: {
+          p_company_name: string
+          p_contact_name: string
+          p_customer_id: string
+          p_phone: string
+        }
+        Returns: undefined
+      }
       update_admin_product: {
         Args: {
           p_dealer_price: number

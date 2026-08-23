@@ -186,3 +186,47 @@ export async function createCustomer(formData: FormData) {
 
   revalidatePath("/admin/customers");
 }
+export async function updateCustomerProfile(formData: FormData) {
+  const customerId = formData.get("customerId");
+  const companyName = formData.get("companyName");
+  const contactName = formData.get("contactName");
+  const phone = formData.get("phone");
+
+  if (
+    typeof customerId !== "string" ||
+    typeof companyName !== "string" ||
+    typeof contactName !== "string" ||
+    typeof phone !== "string" ||
+    !companyName.trim() ||
+    !contactName.trim()
+  ) {
+    throw new Error("Geçersiz müşteri bilgisi.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { error } = await supabase.rpc(
+    "update_admin_customer_profile",
+    {
+      p_customer_id: customerId,
+      p_company_name: companyName,
+      p_contact_name: contactName,
+      p_phone: phone,
+    }
+  );
+
+  if (error) {
+    throw new Error("Müşteri bilgileri güncellenemedi.");
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath("/account");
+}
