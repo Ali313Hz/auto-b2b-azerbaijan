@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -143,6 +143,7 @@ export type Database = {
       customer_profiles: {
         Row: {
           active: boolean
+          archived_at: string | null
           company_name: string | null
           contact_name: string | null
           created_at: string
@@ -153,6 +154,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          archived_at?: string | null
           company_name?: string | null
           contact_name?: string | null
           created_at?: string
@@ -163,6 +165,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          archived_at?: string | null
           company_name?: string | null
           contact_name?: string | null
           created_at?: string
@@ -392,6 +395,10 @@ export type Database = {
         Args: { p_product_id: string; p_quantity: number }
         Returns: number
       }
+      archive_admin_customer: {
+        Args: { p_customer_id: string }
+        Returns: boolean
+      }
       change_cart_quantity: {
         Args: { p_delta: number; p_product_id: string }
         Returns: number
@@ -432,9 +439,11 @@ export type Database = {
         Args: never
         Returns: {
           active: boolean
+          archived_at: string
           company_name: string
           contact_name: string
           created_at: string
+          email: string
           id: string
           phone: string
           price_group: Database["public"]["Enums"]["customer_price_group"]
@@ -497,6 +506,10 @@ export type Database = {
         }[]
       }
       remove_from_cart: { Args: { p_product_id: string }; Returns: undefined }
+      restore_admin_customer: {
+        Args: { p_customer_id: string }
+        Returns: boolean
+      }
       set_customer_active: {
         Args: { new_active: boolean; target_customer_id: string }
         Returns: boolean

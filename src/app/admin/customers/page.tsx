@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 import {
+  archiveCustomer,
   createCustomer,
+  restoreCustomer,
   updateCustomerActive,
   updateCustomerLogin,
   updateCustomerPriceGroup,
@@ -58,9 +60,7 @@ export default async function AdminCustomersPage() {
 
         <form action={createCustomer} className="mt-6 space-y-5">
           <div>
-            <label className="block text-sm">
-              E-posta
-            </label>
+            <label className="block text-sm">E-posta</label>
 
             <input
               type="email"
@@ -91,9 +91,7 @@ export default async function AdminCustomersPage() {
           </div>
 
           <div>
-            <label className="block text-sm">
-              Şirket adı
-            </label>
+            <label className="block text-sm">Şirket adı</label>
 
             <input
               name="companyName"
@@ -103,9 +101,7 @@ export default async function AdminCustomersPage() {
           </div>
 
           <div>
-            <label className="block text-sm">
-              Yetkili kişi
-            </label>
+            <label className="block text-sm">Yetkili kişi</label>
 
             <input
               name="contactName"
@@ -115,9 +111,7 @@ export default async function AdminCustomersPage() {
           </div>
 
           <div>
-            <label className="block text-sm">
-              Telefon
-            </label>
+            <label className="block text-sm">Telefon</label>
 
             <input
               type="tel"
@@ -127,9 +121,7 @@ export default async function AdminCustomersPage() {
           </div>
 
           <div>
-            <label className="block text-sm">
-              Fiyat grubu
-            </label>
+            <label className="block text-sm">Fiyat grubu</label>
 
             <select
               name="priceGroup"
@@ -143,9 +135,7 @@ export default async function AdminCustomersPage() {
           </div>
 
           <div>
-            <label className="block text-sm">
-              Durum
-            </label>
+            <label className="block text-sm">Durum</label>
 
             <select
               name="active"
@@ -170,132 +160,38 @@ export default async function AdminCustomersPage() {
         <p className="mt-8">Müşteri bulunamadı.</p>
       ) : (
         <div className="mt-8 space-y-6">
-          {customers.map((customer) => (
-            <div
-              key={customer.id}
-              className="rounded-xl border border-zinc-800 p-6"
-            >
-              <form
-                action={updateCustomerProfile}
-                className="space-y-4"
+          {customers.map((customer) => {
+            const isArchived = customer.archived_at !== null;
+
+            return (
+              <div
+                key={customer.id}
+                className="rounded-xl border border-zinc-800 p-6"
               >
-                <input
-                  type="hidden"
-                  name="customerId"
-                  value={customer.id}
-                />
+                {isArchived && (
+                  <div className="mb-6 rounded-lg border border-amber-800 bg-amber-950/30 p-4">
+                    <p className="font-semibold text-amber-300">
+                      Arşivlenmiş müşteri
+                    </p>
 
-                <div>
-                  <label className="block text-sm">
-                    Şirket adı
-                  </label>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      Bu müşteri giriş yapamaz ve aktif hale
+                      getirilemez.
+                    </p>
+                  </div>
+                )}
+<div className="mb-6 rounded-lg border border-zinc-800 p-4">
+  <p className="text-sm text-zinc-400">
+    E-posta
+  </p>
 
-                  <input
-                    name="companyName"
-                    required
-                    defaultValue={customer.company_name ?? ""}
-                    className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm">
-                    Yetkili kişi
-                  </label>
-
-                  <input
-                    name="contactName"
-                    required
-                    defaultValue={customer.contact_name ?? ""}
-                    className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm">
-                    Telefon
-                  </label>
-
-                  <input
-                    type="tel"
-                    name="phone"
-                    defaultValue={customer.phone ?? ""}
-                    className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="rounded-lg bg-white px-4 py-2 font-medium text-black"
-                >
-                  Bilgileri Kaydet
-                </button>
-              </form>
-
-              <form
-                action={updateCustomerLogin}
-                className="mt-6 space-y-4 border-t border-zinc-800 pt-5"
-              >
-                <input
-                  type="hidden"
-                  name="customerId"
-                  value={customer.id}
-                />
-
-                <h3 className="font-semibold">
-                  Giriş Bilgileri
-                </h3>
-
-                <div>
-                  <label className="block text-sm">
-                    Yeni e-posta
-                  </label>
-
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="Değişmeyecekse boş bırak"
-                    autoComplete="off"
-                    className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm">
-                    Yeni şifre
-                  </label>
-
-                  <input
-                    type="password"
-                    name="password"
-                    minLength={8}
-                    placeholder="Değişmeyecekse boş bırak"
-                    autoComplete="new-password"
-                    className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-
-                  <p className="mt-1 text-xs text-zinc-400">
-                    Yeni şifre girilecekse en az 8 karakter olmalıdır.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  className="rounded-lg border border-zinc-700 px-4 py-2"
-                >
-                  Giriş Bilgilerini Güncelle
-                </button>
-              </form>
-
-              <div className="mt-6 border-t border-zinc-800 pt-5">
-                <p>
-                  Durum:{" "}
-                  {customer.active ? "Aktif" : "Deaktif"}
-                </p>
-
+  <p className="mt-1 font-medium">
+    {customer.email}
+  </p>
+</div>
                 <form
-                  action={updateCustomerActive}
-                  className="mt-3"
+                  action={updateCustomerProfile}
+                  className="space-y-4"
                 >
                   <input
                     type="hidden"
@@ -303,60 +199,232 @@ export default async function AdminCustomersPage() {
                     value={customer.id}
                   />
 
-                  <input
-                    type="hidden"
-                    name="active"
-                    value={
-                      customer.active ? "false" : "true"
-                    }
-                  />
+                  <div>
+                    <label className="block text-sm">
+                      Şirket adı
+                    </label>
 
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-zinc-700 px-4 py-2"
-                  >
-                    {customer.active
-                      ? "Deaktif et"
-                      : "Aktif et"}
-                  </button>
+                    <input
+                      name="companyName"
+                      required
+                      disabled={isArchived}
+                      defaultValue={customer.company_name ?? ""}
+                      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2 disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm">
+                      Yetkili kişi
+                    </label>
+
+                    <input
+                      name="contactName"
+                      required
+                      disabled={isArchived}
+                      defaultValue={customer.contact_name ?? ""}
+                      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2 disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm">
+                      Telefon
+                    </label>
+
+                    <input
+                      type="tel"
+                      name="phone"
+                      disabled={isArchived}
+                      defaultValue={customer.phone ?? ""}
+                      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2 disabled:opacity-50"
+                    />
+                  </div>
+
+                  {!isArchived && (
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-white px-4 py-2 font-medium text-black"
+                    >
+                      Bilgileri Kaydet
+                    </button>
+                  )}
                 </form>
-              </div>
 
-              <form
-                action={updateCustomerPriceGroup}
-                className="mt-5 flex flex-wrap items-end gap-3"
-              >
-                <input
-                  type="hidden"
-                  name="customerId"
-                  value={customer.id}
-                />
-
-                <div>
-                  <label className="block text-sm">
-                    Fiyat grubu
-                  </label>
-
-                  <select
-                    name="priceGroup"
-                    defaultValue={customer.price_group}
-                    className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
+                {!isArchived && (
+                  <form
+                    action={updateCustomerLogin}
+                    className="mt-6 space-y-4 border-t border-zinc-800 pt-5"
                   >
-                    <option value="NORMAL">NORMAL</option>
-                    <option value="DEALER">DEALER</option>
-                    <option value="VIP">VIP</option>
-                  </select>
+                    <input
+                      type="hidden"
+                      name="customerId"
+                      value={customer.id}
+                    />
+
+                    <h3 className="font-semibold">
+                      Giriş Bilgileri
+                    </h3>
+                    <p className="text-sm text-zinc-400">
+  Mevcut e-posta: {customer.email}
+</p>
+
+                    <div>
+                      <label className="block text-sm">
+                        Yeni e-posta
+                      </label>
+
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="Değişmeyecekse boş bırak"
+                        autoComplete="off"
+                        className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm">
+                        Yeni şifre
+                      </label>
+
+                      <input
+                        type="password"
+                        name="password"
+                        minLength={8}
+                        placeholder="Değişmeyecekse boş bırak"
+                        autoComplete="new-password"
+                        className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+                      />
+
+                      <p className="mt-1 text-xs text-zinc-400">
+                        Yeni şifre girilecekse en az 8 karakter
+                        olmalıdır.
+                      </p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="rounded-lg border border-zinc-700 px-4 py-2"
+                    >
+                      Giriş Bilgilerini Güncelle
+                    </button>
+                  </form>
+                )}
+
+                <div className="mt-6 border-t border-zinc-800 pt-5">
+                  <p>
+                    Durum:{" "}
+                    {isArchived
+                      ? "Arşivde"
+                      : customer.active
+                        ? "Aktif"
+                        : "Deaktif"}
+                  </p>
+
+                  {!isArchived && (
+                    <form
+                      action={updateCustomerActive}
+                      className="mt-3"
+                    >
+                      <input
+                        type="hidden"
+                        name="customerId"
+                        value={customer.id}
+                      />
+
+                      <input
+                        type="hidden"
+                        name="active"
+                        value={
+                          customer.active ? "false" : "true"
+                        }
+                      />
+
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-zinc-700 px-4 py-2"
+                      >
+                        {customer.active
+                          ? "Deaktif et"
+                          : "Aktif et"}
+                      </button>
+                    </form>
+                  )}
                 </div>
 
-                <button
-                  type="submit"
-                  className="rounded-lg bg-white px-4 py-2 font-medium text-black"
-                >
-                  Fiyat Grubunu Kaydet
-                </button>
-              </form>
-            </div>
-          ))}
+                {!isArchived && (
+                  <form
+                    action={updateCustomerPriceGroup}
+                    className="mt-5 flex flex-wrap items-end gap-3"
+                  >
+                    <input
+                      type="hidden"
+                      name="customerId"
+                      value={customer.id}
+                    />
+
+                    <div>
+                      <label className="block text-sm">
+                        Fiyat grubu
+                      </label>
+
+                      <select
+                        name="priceGroup"
+                        defaultValue={customer.price_group}
+                        className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
+                      >
+                        <option value="NORMAL">NORMAL</option>
+                        <option value="DEALER">DEALER</option>
+                        <option value="VIP">VIP</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-white px-4 py-2 font-medium text-black"
+                    >
+                      Fiyat Grubunu Kaydet
+                    </button>
+                  </form>
+                )}
+
+                <div className="mt-6 border-t border-zinc-800 pt-5">
+                  {isArchived ? (
+                    <form action={restoreCustomer}>
+                      <input
+                        type="hidden"
+                        name="customerId"
+                        value={customer.id}
+                      />
+
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-emerald-800 px-4 py-2 text-emerald-400"
+                      >
+                        Arşivden Çıkar
+                      </button>
+                    </form>
+                  ) : (
+                    <form action={archiveCustomer}>
+                      <input
+                        type="hidden"
+                        name="customerId"
+                        value={customer.id}
+                      />
+
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-amber-800 px-4 py-2 text-amber-400"
+                      >
+                        Müşteriyi Arşivle
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </main>

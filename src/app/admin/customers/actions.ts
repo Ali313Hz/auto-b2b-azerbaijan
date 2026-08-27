@@ -305,3 +305,70 @@ export async function updateCustomerProfile(formData: FormData) {
   revalidatePath("/admin/customers");
   revalidatePath("/account");
 }
+
+export async function archiveCustomer(formData: FormData) {
+  const customerId = formData.get("customerId");
+
+  if (typeof customerId !== "string" || !customerId) {
+    throw new Error("Geçersiz müşteri bilgisi.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { error } = await supabase.rpc(
+    "archive_admin_customer",
+    {
+      p_customer_id: customerId,
+    }
+  );
+
+  if (error) {
+    throw new Error("Müşteri arşivlenemedi.");
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath("/account");
+  revalidatePath("/products");
+  revalidatePath("/cart");
+  revalidatePath("/orders");
+}
+
+export async function restoreCustomer(formData: FormData) {
+  const customerId = formData.get("customerId");
+
+  if (typeof customerId !== "string" || !customerId) {
+    throw new Error("Geçersiz müşteri bilgisi.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { error } = await supabase.rpc(
+    "restore_admin_customer",
+    {
+      p_customer_id: customerId,
+    }
+  );
+
+  if (error) {
+    throw new Error("Müşteri arşivden çıkarılamadı.");
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath("/account");
+}
