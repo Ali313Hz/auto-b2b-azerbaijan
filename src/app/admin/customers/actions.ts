@@ -43,6 +43,7 @@ export async function updateCustomerPriceGroup(formData: FormData) {
   revalidatePath("/account");
   revalidatePath("/products");
 }
+
 export async function updateCustomerActive(formData: FormData) {
   const customerId = formData.get("customerId");
   const activeValue = formData.get("active");
@@ -160,8 +161,6 @@ export async function createCustomer(formData: FormData) {
   });
 
   if (authError || !createdUser.user) {
-   
-
     throw new Error("Müşteri giriş hesabı oluşturulamadı.");
   }
 
@@ -177,8 +176,6 @@ export async function createCustomer(formData: FormData) {
     });
 
   if (profileError) {
-   
-
     await admin.auth.admin.deleteUser(createdUser.user.id);
 
     throw new Error("Müşteri profili oluşturulamadı.");
@@ -186,6 +183,84 @@ export async function createCustomer(formData: FormData) {
 
   revalidatePath("/admin/customers");
 }
+
+export async function updateCustomerLogin(formData: FormData) {
+  const customerId = formData.get("customerId");
+  const emailValue = formData.get("email");
+  const passwordValue = formData.get("password");
+
+  if (
+    typeof customerId !== "string" ||
+    typeof emailValue !== "string" ||
+    typeof passwordValue !== "string"
+  ) {
+    throw new Error("Geçersiz giriş bilgisi.");
+  }
+
+  const email = emailValue.trim().toLowerCase();
+  const password = passwordValue.trim();
+
+  if (!email && !password) {
+    throw new Error("Yeni e-posta veya şifre girilmelidir.");
+  }
+
+  if (password && password.length < 8) {
+    throw new Error("Yeni şifre en az 8 karakter olmalıdır.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { data: staff } = await supabase
+    .from("staff_profiles")
+    .select("role, active")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!staff || !staff.active || staff.role !== "OWNER") {
+    throw new Error("Bu işlem için yetkiniz yok.");
+  }
+
+  const { createAdminClient } = await import(
+    "@/lib/supabase/admin"
+  );
+
+  const admin = createAdminClient();
+
+  const attributes: {
+    email?: string;
+    password?: string;
+    email_confirm?: boolean;
+  } = {};
+
+  if (email) {
+    attributes.email = email;
+    attributes.email_confirm = true;
+  }
+
+  if (password) {
+    attributes.password = password;
+  }
+
+  const { error } = await admin.auth.admin.updateUserById(
+    customerId,
+    attributes
+  );
+
+  if (error) {
+    throw new Error("Müşteri giriş bilgileri güncellenemedi.");
+  }
+
+  revalidatePath("/admin/customers");
+}
+
 export async function updateCustomerProfile(formData: FormData) {
   const customerId = formData.get("customerId");
   const companyName = formData.get("companyName");
