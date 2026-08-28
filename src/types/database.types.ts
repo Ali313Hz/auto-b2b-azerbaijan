@@ -435,16 +435,26 @@ export type Database = {
           sort_order: number
         }[]
       }
+      get_admin_customer_delete_status: {
+        Args: { p_customer_id: string }
+        Returns: {
+          archived: boolean
+          can_delete: boolean
+          order_count: number
+        }[]
+      }
       get_admin_customers: {
         Args: never
         Returns: {
           active: boolean
           archived_at: string
+          can_permanently_delete: boolean
           company_name: string
           contact_name: string
           created_at: string
           email: string
           id: string
+          order_count: number
           phone: string
           price_group: Database["public"]["Enums"]["customer_price_group"]
         }[]

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
+import DeleteCustomerButton from "./DeleteCustomerButton";
+
 import {
   archiveCustomer,
   createCustomer,
@@ -187,6 +189,10 @@ export default async function AdminCustomersPage() {
 
   <p className="mt-1 font-medium">
     {customer.email}
+  </p>
+
+  <p className="mt-2 text-sm text-zinc-400">
+    Sipariş sayısı: {customer.order_count}
   </p>
 </div>
                 <form
@@ -390,22 +396,38 @@ export default async function AdminCustomersPage() {
                 )}
 
                 <div className="mt-6 border-t border-zinc-800 pt-5">
-                  {isArchived ? (
-                    <form action={restoreCustomer}>
-                      <input
-                        type="hidden"
-                        name="customerId"
-                        value={customer.id}
-                      />
 
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-emerald-800 px-4 py-2 text-emerald-400"
-                      >
-                        Arşivden Çıkar
-                      </button>
-                    </form>
-                  ) : (
+
+                  {isArchived ? (
+  <div>
+    <form action={restoreCustomer}>
+      <input
+        type="hidden"
+        name="customerId"
+        value={customer.id}
+      />
+
+      <button
+        type="submit"
+        className="rounded-lg border border-emerald-800 px-4 py-2 text-emerald-400"
+      >
+        Arşivden Çıkar
+      </button>
+    </form>
+
+    {customer.can_permanently_delete && (
+      <div className="mt-3">
+        <DeleteCustomerButton
+          customerId={customer.id}
+          companyName={customer.company_name}
+        />
+      </div>
+    )}
+  </div>
+) : (
+
+
+
                     <form action={archiveCustomer}>
                       <input
                         type="hidden"

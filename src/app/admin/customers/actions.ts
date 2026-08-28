@@ -372,3 +372,67 @@ export async function restoreCustomer(formData: FormData) {
   revalidatePath("/admin/customers");
   revalidatePath("/account");
 }
+
+export async function permanentlyDeleteCustomer(formData: FormData) {
+  const customerId = formData.get("customerId");
+
+  if (typeof customerId !== "string" || !customerId) {
+    throw new Error("Geçersiz müşteri bilgisi.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { data: staff } = await supabase
+    .from("staff_profiles")
+    .select("role, active")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!staff || !staff.active || staff.role !== "OWNER") {
+    throw new Error("Bu işlem için yetkiniz yok.");
+  }
+
+  const { data: deleteStatus, error: statusError } =
+    await supabase.rpc("get_admin_customer_delete_status", {
+      p_customer_id: customerId,
+    });
+
+  if (statusError || !deleteStatus?.[0]) {
+    throw new Error("Müşteri silme durumu kontrol edilemedi.");
+  }
+
+  const status = deleteStatus[0];
+
+  if (
+    !status.archived ||
+    status.order_count !== 0 ||
+    !status.can_delete
+  ) {
+    throw new Error(
+      "Bu müşteri kalıcı olarak silinemez. Önce arşivlenmiş ve siparişsiz olmalıdır."
+    );
+  }
+
+  const { createAdminClient } = await import(
+    "@/lib/supabase/admin"
+  );
+
+  const admin = createAdminClient();
+
+  const { error: deleteError } =
+    await admin.auth.admin.deleteUser(customerId);
+
+  if (deleteError) {
+    throw new Error("Müşteri kalıcı olarak silinemedi.");
+  }
+
+  revalidatePath("/admin/customers");
+}
