@@ -389,3 +389,66 @@ export async function deleteProductImage(
   revalidatePath("/admin/products");
   revalidatePath("/products");
 }
+
+export async function registerProductVideo(formData: FormData) {
+  const productId = formData.get("productId");
+  const storagePath = formData.get("storagePath");
+  const originalName = formData.get("originalName");
+  const mimeType = formData.get("mimeType");
+
+  if (
+    typeof productId !== "string" ||
+    !productId ||
+    typeof storagePath !== "string" ||
+    !storagePath ||
+    typeof originalName !== "string" ||
+    typeof mimeType !== "string"
+  ) {
+    throw new Error("Geçersiz video bilgisi.");
+  }
+
+  const allowedVideoTypes = [
+    "video/mp4",
+    "video/webm",
+  ];
+
+  if (!allowedVideoTypes.includes(mimeType)) {
+    throw new Error(
+      "Sadece MP4 veya WEBM video yüklenebilir."
+    );
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { error: mediaError } = await supabase.rpc(
+    "create_admin_product_media",
+    {
+      p_product_id: productId,
+      p_media_type: "VIDEO",
+      p_storage_path: storagePath,
+      p_original_name: originalName,
+      p_mime_type: mimeType,
+    }
+  );
+
+  if (mediaError) {
+    await supabase.storage
+      .from("product-media")
+      .remove([storagePath]);
+
+    throw new Error(
+      "Video ürün kaydına bağlanamadı."
+    );
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath("/products");
+}
