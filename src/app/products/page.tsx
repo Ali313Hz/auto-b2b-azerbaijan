@@ -42,7 +42,19 @@ export default async function ProductsPage() {
               key={product.id}
               className="rounded-xl border border-zinc-800 p-5"
             >
-              <p className="font-semibold">{product.sku}</p>
+              <p className="text-lg font-semibold">
+  {product.name}
+</p>
+
+<p className="mt-1 text-sm text-zinc-400">
+  SKU: {product.sku}
+</p>
+
+{product.description && (
+  <p className="mt-3 text-zinc-300">
+    {product.description}
+  </p>
+)}
               <p className="mt-2 text-sm text-zinc-400">
   Kategori: {product.category_name ?? "Kategorisiz"}
 </p>

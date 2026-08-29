@@ -174,3 +174,55 @@ export async function createProduct(formData: FormData) {
   revalidatePath("/admin/products");
   revalidatePath("/products");
 }
+
+export async function updateProductContent(formData: FormData) {
+  const productId = formData.get("productId");
+  const nameValue = formData.get("name");
+  const descriptionValue = formData.get("description");
+  const categoryIdValue = formData.get("categoryId");
+
+  if (
+  typeof productId !== "string" ||
+  typeof nameValue !== "string" ||
+  typeof descriptionValue !== "string" ||
+  typeof categoryIdValue !== "string" ||
+  !categoryIdValue
+) {
+  throw new Error("Geçersiz ürün bilgisi.");
+}
+
+  const name = nameValue.trim();
+  const description = descriptionValue.trim();
+
+  if (!name) {
+    throw new Error("Ürün adı gereklidir.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { error } = await supabase.rpc(
+    "update_admin_product_content",
+    {
+      p_product_id: productId,
+      p_name: name,
+      p_description: description,
+      p_category_id: categoryIdValue,
+    }
+  );
+
+  if (error) {
+    throw new Error("Ürün bilgileri güncellenemedi.");
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath("/products");
+}
+

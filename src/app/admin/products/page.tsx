@@ -5,6 +5,7 @@ import {
   createProduct,
   updateProduct,
   updateProductActive,
+  updateProductContent,
 } from "./actions";
 
 export default async function AdminProductsPage() {
@@ -185,8 +186,12 @@ export default async function AdminProductsPage() {
               className="rounded-xl border border-zinc-800 p-5"
             >
               <p className="text-lg font-semibold">
-                {product.sku}
-              </p>
+  {product.name}
+</p>
+
+<p className="mt-1 text-sm text-zinc-400">
+  SKU: {product.sku}
+</p>
 
               <p className="mt-2">
                 Kategori:{" "}
@@ -197,6 +202,77 @@ export default async function AdminProductsPage() {
                 Durum:{" "}
                 {product.active ? "Aktif" : "Deaktif"}
               </p>
+
+              <form
+  action={updateProductContent}
+  className="mt-5 space-y-4 rounded-lg border border-zinc-800 p-4"
+>
+  <input
+    type="hidden"
+    name="productId"
+    value={product.id}
+  />
+
+  <div>
+    <label className="block text-sm">
+      Ürün adı
+    </label>
+
+    <input
+      name="name"
+      required
+      defaultValue={product.name}
+      className="mt-1 block w-full rounded-lg border border-zinc-700 bg-black px-3 py-2"
+    />
+  </div>
+
+  <div>
+    <label className="block text-sm">
+      Açıklama
+    </label>
+
+    <textarea
+      name="description"
+      rows={4}
+      defaultValue={product.description ?? ""}
+      className="mt-1 block w-full rounded-lg border border-zinc-700 bg-black px-3 py-2"
+    />
+  </div>
+
+  <div>
+    <label className="block text-sm">
+      Kategori
+    </label>
+
+    <select
+      name="categoryId"
+      required
+      defaultValue={product.category_id ?? ""}
+      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+    >
+      <option value="" disabled>
+        Kategori seç
+      </option>
+
+      {categories?.map((category) => (
+        <option
+          key={category.id}
+          value={category.id}
+        >
+          {category.name}
+          {category.active ? "" : " (Deaktif)"}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  <button
+    type="submit"
+    className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
+  >
+    Ürün Bilgilerini Kaydet
+  </button>
+</form>
 
               <form
                 action={updateProductActive}
