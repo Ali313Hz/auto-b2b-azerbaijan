@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -285,6 +285,50 @@ export type Database = {
           old_price_group?: Database["public"]["Enums"]["customer_price_group"]
         }
         Relationships: []
+      }
+      product_media: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          media_type: string
+          mime_type: string
+          original_name: string | null
+          product_id: string
+          sort_order: number
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          media_type: string
+          mime_type: string
+          original_name?: string | null
+          product_id: string
+          sort_order?: number
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          media_type?: string
+          mime_type?: string
+          original_name?: string | null
+          product_id?: string
+          sort_order?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_media_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_prices: {
         Row: {
