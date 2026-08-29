@@ -326,7 +326,9 @@ export type Database = {
           active: boolean
           category_id: string | null
           created_at: string
+          description: string | null
           id: string
+          name: string
           sku: string
           stock: number
           updated_at: string
@@ -335,7 +337,9 @@ export type Database = {
           active?: boolean
           category_id?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          name: string
           sku: string
           stock?: number
           updated_at?: string
@@ -344,7 +348,9 @@ export type Database = {
           active?: boolean
           category_id?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          name?: string
           sku?: string
           stock?: number
           updated_at?: string
@@ -466,7 +472,9 @@ export type Database = {
           category_id: string
           category_name: string
           dealer_price: number
+          description: string
           id: string
+          name: string
           normal_price: number
           sku: string
           stock: number
@@ -490,7 +498,9 @@ export type Database = {
           category_id: string
           category_name: string
           category_slug: string
+          description: string
           id: string
+          name: string
           price: number
           sku: string
           stock: number
@@ -562,6 +572,15 @@ export type Database = {
       }
       update_admin_product_active: {
         Args: { p_active: boolean; p_product_id: string }
+        Returns: undefined
+      }
+      update_admin_product_content: {
+        Args: {
+          p_category_id: string
+          p_description: string
+          p_name: string
+          p_product_id: string
+        }
         Returns: undefined
       }
     }
