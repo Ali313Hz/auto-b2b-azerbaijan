@@ -574,6 +574,7 @@ export type Database = {
           id: string
           name: string
           price: number
+          primary_image_path: string
           sku: string
           stock: number
         }[]
@@ -595,6 +596,15 @@ export type Database = {
           order_id: string
           status: Database["public"]["Enums"]["order_status"]
           total_amount: number
+        }[]
+      }
+      get_customer_product_media: {
+        Args: { p_product_id: string }
+        Returns: {
+          id: string
+          is_primary: boolean
+          sort_order: number
+          storage_path: string
         }[]
       }
       remove_from_cart: { Args: { p_product_id: string }; Returns: undefined }
