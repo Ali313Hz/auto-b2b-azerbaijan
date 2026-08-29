@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   createProduct,
+  deleteProductImage,
+  setProductPrimaryImage,
   updateProduct,
   updateProductActive,
   updateProductContent,
@@ -33,10 +35,10 @@ export default async function AdminProductsPage() {
   const { data: products, error: productsError } =
     await supabase.rpc("get_admin_products");
 
-  const { data: categories, error: categoriesError } =
-    await supabase.rpc("get_admin_categories");
+ const { data: categories, error: categoriesError } =
+  await supabase.rpc("get_admin_categories");
 
-    const productsWithImages = await Promise.all(
+const productsWithMedia = await Promise.all(
   (products ?? []).map(async (product) => {
     const { data: media } = await supabase.rpc(
       "get_admin_product_media",
@@ -45,35 +47,31 @@ export default async function AdminProductsPage() {
       }
     );
 
-    const primaryImage =
-      media?.find(
-        (item) =>
-          item.media_type === "IMAGE" &&
-          item.is_primary
-      ) ??
-      media?.find(
-        (item) => item.media_type === "IMAGE"
-      );
+    const images = (media ?? []).filter(
+      (item) => item.media_type === "IMAGE"
+    );
 
-    if (!primaryImage) {
-      return {
-        ...product,
-        imageUrl: null,
-      };
-    }
+    const imagesWithUrls = await Promise.all(
+      images.map(async (image) => {
+        const { data: signedUrlData } =
+          await supabase.storage
+            .from("product-media")
+            .createSignedUrl(
+              image.storage_path,
+              60 * 60
+            );
 
-    const { data: signedUrlData } =
-      await supabase.storage
-        .from("product-media")
-        .createSignedUrl(
-          primaryImage.storage_path,
-          60 * 60
-        );
+        return {
+          ...image,
+          imageUrl:
+            signedUrlData?.signedUrl ?? null,
+        };
+      })
+    );
 
     return {
       ...product,
-      imageUrl:
-        signedUrlData?.signedUrl ?? null,
+      images: imagesWithUrls,
     };
   })
 );
@@ -219,11 +217,11 @@ export default async function AdminProductsPage() {
         </button>
       </form>
 
-      {productsWithImages.length === 0 ? (
+      {productsWithMedia.length === 0 ? (
         <p className="mt-6">Ürün bulunamadı.</p>
       ) : (
         <div className="mt-8 space-y-4">
-          {productsWithImages.map((product) => (
+          {productsWithMedia.map((product) => (
             <div
               key={product.id}
               className="rounded-xl border border-zinc-800 p-5"
@@ -236,14 +234,73 @@ export default async function AdminProductsPage() {
   SKU: {product.sku}
 </p>
 
-{product.imageUrl && (
-  <div className="mt-4">
-    {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img
-      src={product.imageUrl}
-      alt={product.name}
-      className="max-h-72 rounded-lg border border-zinc-800 object-contain"
-    />
+{product.images.length > 0 && (
+  <div className="mt-5">
+    <p className="font-semibold">
+      Ürün Fotoğrafları
+    </p>
+
+    <div className="mt-3 flex flex-wrap gap-4">
+      {product.images.map((image) => (
+        <div
+          key={image.id}
+          className="w-56 rounded-lg border border-zinc-800 p-3"
+        >
+          {image.imageUrl && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.imageUrl}
+                alt={product.name}
+                className="h-40 w-full rounded-lg object-contain"
+              />
+            </>
+          )}
+
+          {image.is_primary ? (
+            <p className="mt-3 text-sm font-semibold text-green-500">
+              Ana fotoğraf
+            </p>
+          ) : (
+            <form
+              action={setProductPrimaryImage}
+              className="mt-3"
+            >
+              <input
+                type="hidden"
+                name="mediaId"
+                value={image.id}
+              />
+
+              <button
+                type="submit"
+                className="rounded-lg border border-zinc-700 px-3 py-2 text-sm"
+              >
+                Ana Fotoğraf Yap
+              </button>
+            </form>
+          )}
+
+          <form
+            action={deleteProductImage}
+            className="mt-2"
+          >
+            <input
+              type="hidden"
+              name="mediaId"
+              value={image.id}
+            />
+
+            <button
+              type="submit"
+              className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-500"
+            >
+              Fotoğrafı Sil
+            </button>
+          </form>
+        </div>
+      ))}
+    </div>
   </div>
 )}
 

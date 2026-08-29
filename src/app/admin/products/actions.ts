@@ -309,3 +309,83 @@ export async function uploadProductImage(formData: FormData) {
 
   revalidatePath("/admin/products");
 }
+
+export async function setProductPrimaryImage(
+  formData: FormData
+) {
+  const mediaId = formData.get("mediaId");
+
+  if (typeof mediaId !== "string" || !mediaId) {
+    throw new Error("Geçersiz fotoğraf bilgisi.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { error } = await supabase.rpc(
+    "set_admin_product_primary_media",
+    {
+      p_media_id: mediaId,
+    }
+  );
+
+  if (error) {
+    throw new Error("Ana fotoğraf değiştirilemedi.");
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath("/products");
+}
+
+export async function deleteProductImage(
+  formData: FormData
+) {
+  const mediaId = formData.get("mediaId");
+
+  if (typeof mediaId !== "string" || !mediaId) {
+    throw new Error("Geçersiz fotoğraf bilgisi.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { data: storagePath, error: deleteError } =
+    await supabase.rpc(
+      "delete_admin_product_media",
+      {
+        p_media_id: mediaId,
+      }
+    );
+
+  if (deleteError || !storagePath) {
+    throw new Error("Fotoğraf kaydı silinemedi.");
+  }
+
+  const { error: storageError } =
+    await supabase.storage
+      .from("product-media")
+      .remove([storagePath]);
+
+  if (storageError) {
+    throw new Error(
+      "Fotoğraf kaydı silindi ancak Storage temizlenemedi."
+    );
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath("/products");
+}
