@@ -474,7 +474,21 @@ export type Database = {
         }
         Returns: string
       }
+      create_admin_product_media: {
+        Args: {
+          p_media_type: string
+          p_mime_type: string
+          p_original_name: string
+          p_product_id: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
       create_order_from_cart: { Args: never; Returns: string }
+      delete_admin_product_media: {
+        Args: { p_media_id: string }
+        Returns: string
+      }
       get_admin_categories: {
         Args: never
         Returns: {
@@ -507,6 +521,20 @@ export type Database = {
           order_count: number
           phone: string
           price_group: Database["public"]["Enums"]["customer_price_group"]
+        }[]
+      }
+      get_admin_product_media: {
+        Args: { p_product_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          media_type: string
+          mime_type: string
+          original_name: string
+          product_id: string
+          sort_order: number
+          storage_path: string
         }[]
       }
       get_admin_products: {
@@ -573,6 +601,10 @@ export type Database = {
       restore_admin_customer: {
         Args: { p_customer_id: string }
         Returns: boolean
+      }
+      set_admin_product_primary_media: {
+        Args: { p_media_id: string }
+        Returns: undefined
       }
       set_customer_active: {
         Args: { new_active: boolean; target_customer_id: string }
