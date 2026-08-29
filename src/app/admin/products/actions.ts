@@ -226,3 +226,86 @@ export async function updateProductContent(formData: FormData) {
   revalidatePath("/products");
 }
 
+export async function uploadProductImage(formData: FormData) {
+  const productId = formData.get("productId");
+  const imageValue = formData.get("image");
+
+  if (
+    typeof productId !== "string" ||
+    !(imageValue instanceof File) ||
+    imageValue.size === 0
+  ) {
+    throw new Error("Geçersiz fotoğraf bilgisi.");
+  }
+
+  const allowedImageTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
+
+  if (!allowedImageTypes.includes(imageValue.type)) {
+    throw new Error(
+      "Sadece JPG, PNG veya WEBP fotoğraf yüklenebilir."
+    );
+  }
+
+  const maxImageSize = 5 * 1024 * 1024;
+
+  if (imageValue.size > maxImageSize) {
+    throw new Error("Fotoğraf en fazla 5 MB olabilir.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const extensionByMimeType: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+
+  const extension = extensionByMimeType[imageValue.type];
+
+  const storagePath =
+    `${productId}/${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("product-media")
+    .upload(storagePath, imageValue, {
+      contentType: imageValue.type,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error("Fotoğraf Storage'a yüklenemedi.");
+  }
+
+  const { error: mediaError } = await supabase.rpc(
+    "create_admin_product_media",
+    {
+      p_product_id: productId,
+      p_media_type: "IMAGE",
+      p_storage_path: storagePath,
+      p_original_name: imageValue.name,
+      p_mime_type: imageValue.type,
+    }
+  );
+
+  if (mediaError) {
+    await supabase.storage
+      .from("product-media")
+      .remove([storagePath]);
+
+    throw new Error("Fotoğraf ürün kaydına bağlanamadı.");
+  }
+
+  revalidatePath("/admin/products");
+}

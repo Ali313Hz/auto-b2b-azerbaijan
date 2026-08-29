@@ -6,6 +6,7 @@ import {
   updateProduct,
   updateProductActive,
   updateProductContent,
+  uploadProductImage,
 } from "./actions";
 
 export default async function AdminProductsPage() {
@@ -34,6 +35,48 @@ export default async function AdminProductsPage() {
 
   const { data: categories, error: categoriesError } =
     await supabase.rpc("get_admin_categories");
+
+    const productsWithImages = await Promise.all(
+  (products ?? []).map(async (product) => {
+    const { data: media } = await supabase.rpc(
+      "get_admin_product_media",
+      {
+        p_product_id: product.id,
+      }
+    );
+
+    const primaryImage =
+      media?.find(
+        (item) =>
+          item.media_type === "IMAGE" &&
+          item.is_primary
+      ) ??
+      media?.find(
+        (item) => item.media_type === "IMAGE"
+      );
+
+    if (!primaryImage) {
+      return {
+        ...product,
+        imageUrl: null,
+      };
+    }
+
+    const { data: signedUrlData } =
+      await supabase.storage
+        .from("product-media")
+        .createSignedUrl(
+          primaryImage.storage_path,
+          60 * 60
+        );
+
+    return {
+      ...product,
+      imageUrl:
+        signedUrlData?.signedUrl ?? null,
+    };
+  })
+);
 
   if (productsError || categoriesError) {
     return (
@@ -176,11 +219,11 @@ export default async function AdminProductsPage() {
         </button>
       </form>
 
-      {!products || products.length === 0 ? (
+      {productsWithImages.length === 0 ? (
         <p className="mt-6">Ürün bulunamadı.</p>
       ) : (
         <div className="mt-8 space-y-4">
-          {products.map((product) => (
+          {productsWithImages.map((product) => (
             <div
               key={product.id}
               className="rounded-xl border border-zinc-800 p-5"
@@ -192,6 +235,17 @@ export default async function AdminProductsPage() {
 <p className="mt-1 text-sm text-zinc-400">
   SKU: {product.sku}
 </p>
+
+{product.imageUrl && (
+  <div className="mt-4">
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img
+      src={product.imageUrl}
+      alt={product.name}
+      className="max-h-72 rounded-lg border border-zinc-800 object-contain"
+    />
+  </div>
+)}
 
               <p className="mt-2">
                 Kategori:{" "}
@@ -271,6 +325,45 @@ export default async function AdminProductsPage() {
     className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
   >
     Ürün Bilgilerini Kaydet
+  </button>
+</form>
+
+<form
+  action={uploadProductImage}
+  className="mt-5 space-y-3 rounded-lg border border-zinc-800 p-4"
+>
+  <input
+    type="hidden"
+    name="productId"
+    value={product.id}
+  />
+
+  <div>
+    <label className="block text-sm font-medium">
+      Ürün fotoğrafı
+    </label>
+
+    <input
+      type="file"
+      name="image"
+      accept="image/jpeg,image/png,image/webp"
+      required
+      className="mt-2 block"
+    />
+
+    <p className="mt-2 text-sm text-zinc-400">
+      JPG, PNG veya WEBP. En fazla 5 MB.
+    </p>
+  </div>
+
+
+
+
+  <button
+    type="submit"
+    className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
+  >
+    Fotoğraf Yükle
   </button>
 </form>
 
