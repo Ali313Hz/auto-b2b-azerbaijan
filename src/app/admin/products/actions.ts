@@ -452,3 +452,49 @@ export async function registerProductVideo(formData: FormData) {
   revalidatePath("/admin/products");
   revalidatePath("/products");
 }
+
+export async function deleteProductVideo(
+  formData: FormData
+) {
+  const mediaId = formData.get("mediaId");
+
+  if (typeof mediaId !== "string" || !mediaId) {
+    throw new Error("Geçersiz video bilgisi.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Oturum bulunamadı.");
+  }
+
+  const { data: storagePath, error: deleteError } =
+    await supabase.rpc(
+      "delete_admin_product_media",
+      {
+        p_media_id: mediaId,
+      }
+    );
+
+  if (deleteError || !storagePath) {
+    throw new Error("Video kaydı silinemedi.");
+  }
+
+  const { error: storageError } =
+    await supabase.storage
+      .from("product-media")
+      .remove([storagePath]);
+
+  if (storageError) {
+    throw new Error(
+      "Video kaydı silindi ancak Storage temizlenemedi."
+    );
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath("/products");
+}

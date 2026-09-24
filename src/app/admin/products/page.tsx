@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-
+import ProductVideoUpload from "./ProductVideoUpload";
 import { createClient } from "@/lib/supabase/server";
 import {
   createProduct,
   deleteProductImage,
+  deleteProductVideo,
   setProductPrimaryImage,
   updateProduct,
   updateProductActive,
@@ -51,6 +52,10 @@ const productsWithMedia = await Promise.all(
       (item) => item.media_type === "IMAGE"
     );
 
+    const videos = (media ?? []).filter(
+  (item) => item.media_type === "VIDEO"
+);
+
     const imagesWithUrls = await Promise.all(
       images.map(async (image) => {
         const { data: signedUrlData } =
@@ -69,9 +74,28 @@ const productsWithMedia = await Promise.all(
       })
     );
 
+    const videosWithUrls = await Promise.all(
+      videos.map(async (video) => {
+        const { data: signedUrlData } =
+          await supabase.storage
+            .from("product-media")
+            .createSignedUrl(
+              video.storage_path,
+              60 * 60
+            );
+
+        return {
+          ...video,
+          videoUrl:
+            signedUrlData?.signedUrl ?? null,
+        };
+      })
+    );
+
     return {
       ...product,
       images: imagesWithUrls,
+      videos: videosWithUrls,
     };
   })
 );
@@ -304,6 +328,56 @@ const productsWithMedia = await Promise.all(
   </div>
 )}
 
+{product.videos.length > 0 && (
+  <div className="mt-5">
+    <p className="font-semibold">
+      Ürün Videoları
+    </p>
+
+    <div className="mt-3 flex flex-wrap gap-4">
+      {product.videos.map((video) => (
+        <div
+          key={video.id}
+          className="w-80 rounded-lg border border-zinc-800 p-3"
+        >
+          {video.videoUrl && (
+            <video
+              src={video.videoUrl}
+              controls
+              preload="metadata"
+              className="w-full rounded-lg"
+            />
+          )}
+
+          {video.original_name && (
+            <p className="mt-2 truncate text-sm text-zinc-400">
+              {video.original_name}
+            </p>
+          )}
+
+          <form
+            action={deleteProductVideo}
+            className="mt-3"
+          >
+            <input
+              type="hidden"
+              name="mediaId"
+              value={video.id}
+            />
+
+            <button
+              type="submit"
+              className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-500"
+            >
+              Videoyu Sil
+            </button>
+          </form>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
               <p className="mt-2">
                 Kategori:{" "}
                 {product.category_name ?? "-"}
@@ -423,7 +497,7 @@ const productsWithMedia = await Promise.all(
     Fotoğraf Yükle
   </button>
 </form>
-
+<ProductVideoUpload productId={product.id} />
               <form
                 action={updateProductActive}
                 className="mt-3"

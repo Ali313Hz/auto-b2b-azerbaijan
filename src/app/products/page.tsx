@@ -43,8 +43,16 @@ export default async function ProductsPage() {
         }
       );
 
+      const images = (media ?? []).filter(
+        (item) => item.media_type === "IMAGE"
+      );
+
+      const videos = (media ?? []).filter(
+        (item) => item.media_type === "VIDEO"
+      );
+
       const imagesWithUrls = await Promise.all(
-        (media ?? []).map(async (image) => {
+        images.map(async (image) => {
           const { data: signedUrlData } =
             await supabase.storage
               .from("product-media")
@@ -61,17 +69,28 @@ export default async function ProductsPage() {
         })
       );
 
-      const primaryImage =
-        imagesWithUrls.find(
-          (image) => image.is_primary
-        ) ??
-        imagesWithUrls[0] ??
-        null;
+      const videosWithUrls = await Promise.all(
+        videos.map(async (video) => {
+          const { data: signedUrlData } =
+            await supabase.storage
+              .from("product-media")
+              .createSignedUrl(
+                video.storage_path,
+                60 * 60
+              );
+
+          return {
+            ...video,
+            videoUrl:
+              signedUrlData?.signedUrl ?? null,
+          };
+        })
+      );
 
       return {
         ...product,
         images: imagesWithUrls,
-        primaryImage,
+        videos: videosWithUrls,
       };
     })
   );
@@ -94,9 +113,31 @@ export default async function ProductsPage() {
               className="rounded-xl border border-zinc-800 p-5"
             >
               <ProductImageGallery
-  images={product.images}
-  productName={product.name}
-/>
+                images={product.images}
+                productName={product.name}
+              />
+
+              {product.videos.length > 0 && (
+                <div className="mt-6">
+                  <p className="mb-3 font-semibold">
+                    Məhsul videosu
+                  </p>
+
+                  <div className="flex flex-wrap gap-4">
+                    {product.videos.map((video) =>
+                      video.videoUrl ? (
+                        <video
+                          key={video.id}
+                          src={video.videoUrl}
+                          controls
+                          preload="metadata"
+                          className="w-full max-w-xl rounded-lg border border-zinc-800"
+                        />
+                      ) : null
+                    )}
+                  </div>
+                </div>
+              )}
 
               <p className="mt-5 text-lg font-semibold">
                 {product.name}
