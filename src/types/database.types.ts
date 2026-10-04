@@ -523,6 +523,33 @@ export type Database = {
           price_group: Database["public"]["Enums"]["customer_price_group"]
         }[]
       }
+      get_admin_order_items: {
+        Args: { p_order_id: string }
+        Returns: {
+          id: string
+          line_total: number
+          product_id: string
+          quantity: number
+          sku: string
+          unit_price: number
+        }[]
+      }
+      get_admin_orders: {
+        Args: never
+        Returns: {
+          company_name: string
+          contact_name: string
+          created_at: string
+          customer_id: string
+          email: string
+          item_count: number
+          order_id: string
+          price_group: Database["public"]["Enums"]["customer_price_group"]
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at: string
+        }[]
+      }
       get_admin_product_media: {
         Args: { p_product_id: string }
         Returns: {
@@ -648,6 +675,13 @@ export type Database = {
           p_phone: string
         }
         Returns: undefined
+      }
+      update_admin_order_status: {
+        Args: {
+          p_order_id: string
+          p_status: Database["public"]["Enums"]["order_status"]
+        }
+        Returns: Database["public"]["Enums"]["order_status"]
       }
       update_admin_product: {
         Args: {
