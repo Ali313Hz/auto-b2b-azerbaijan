@@ -5,7 +5,7 @@ import { useState } from "react";
 type ProductImage = {
   id: string;
   is_primary: boolean;
-  imageUrl: string | null;
+  imageUrl: string;
 };
 
 type ProductImageGalleryProps = {
@@ -17,69 +17,59 @@ export default function ProductImageGallery({
   images,
   productName,
 }: ProductImageGalleryProps) {
-  const availableImages = images.filter(
-    (image) => image.imageUrl
+  const primaryImage =
+    images.find((image) => image.is_primary) ?? images[0] ?? null;
+
+  const [selectedImageId, setSelectedImageId] = useState(
+    primaryImage?.id ?? null
   );
 
-  const primaryImage =
-    availableImages.find(
-      (image) => image.is_primary
-    ) ??
-    availableImages[0] ??
-    null;
-
-  const [selectedImageId, setSelectedImageId] =
-    useState(primaryImage?.id ?? null);
-
   const selectedImage =
-    availableImages.find(
-      (image) => image.id === selectedImageId
-    ) ??
-    primaryImage;
+    images.find((image) => image.id === selectedImageId) ?? primaryImage;
 
-  if (!selectedImage?.imageUrl) {
-    return null;
+  if (!selectedImage) {
+    return (
+      <div className="card grid aspect-[4/3] place-items-center text-sm text-zinc-600">
+        Şəkil yoxdur
+      </div>
+    );
   }
 
   return (
     <div>
-      <div className="flex min-h-96 items-center justify-center">
+      <div className="card flex aspect-[4/3] items-center justify-center overflow-hidden bg-zinc-950">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={selectedImage.imageUrl}
           alt={productName}
-          className="max-h-96 max-w-full rounded-lg object-contain"
+          className="h-full w-full object-contain p-3"
         />
       </div>
 
-      {availableImages.length > 1 && (
-        <div className="mt-4 flex flex-wrap gap-3">
-          {availableImages.map((image) => {
-            if (!image.imageUrl) {
-              return null;
-            }
-
-            const isSelected =
-              image.id === selectedImage.id;
+      {images.length > 1 && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {images.map((image, index) => {
+            const isSelected = image.id === selectedImage.id;
 
             return (
               <button
                 key={image.id}
                 type="button"
-                onClick={() =>
-                  setSelectedImageId(image.id)
-                }
-                className={
+                onClick={() => setSelectedImageId(image.id)}
+                aria-label={`Şəkil ${index + 1}`}
+                aria-pressed={isSelected}
+                className={`shrink-0 overflow-hidden rounded-lg border-2 bg-zinc-950 p-0.5 ${
                   isSelected
-                    ? "rounded-lg border-2 border-green-600 p-1"
-                    : "rounded-lg border border-zinc-700 p-1"
-                }
+                    ? "border-amber-500"
+                    : "border-zinc-800 hover:border-zinc-600"
+                }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={image.imageUrl}
-                  alt={productName}
-                  className="h-24 w-24 rounded object-contain"
+                  alt=""
+                  loading="lazy"
+                  className="h-16 w-16 object-contain sm:h-20 sm:w-20"
                 />
               </button>
             );

@@ -3,13 +3,27 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  type ActionResult,
+  dbErrorMessage,
+  fail,
+  ok,
+} from "@/lib/action-result";
 import { createClient } from "@/lib/supabase/server";
 
-export async function addToCart(formData: FormData) {
+export async function addToCart(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
   const productId = formData.get("productId");
+  const quantity = Number(formData.get("quantity") ?? 1);
 
-  if (typeof productId !== "string") {
-    return;
+  if (typeof productId !== "string" || !productId) {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
+
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10000) {
+    return fail("Miqdar 1 və ya daha çox tam ədəd olmalıdır.");
   }
 
   const supabase = await createClient();
@@ -24,12 +38,14 @@ export async function addToCart(formData: FormData) {
 
   const { error } = await supabase.rpc("add_to_cart", {
     p_product_id: productId,
-    p_quantity: 1,
+    p_quantity: quantity,
   });
 
   if (error) {
-    throw new Error("Sepete ekleme başarısız.");
+    return fail(dbErrorMessage(error, "Məhsul səbətə əlavə edilmədi."));
   }
 
-  revalidatePath("/products");
+  revalidatePath("/", "layout");
+
+  return ok("Səbətə əlavə edildi.");
 }

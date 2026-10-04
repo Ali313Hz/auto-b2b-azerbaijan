@@ -9,14 +9,19 @@ export async function login(formData: FormData) {
   const email = formData.get("email");
   const password = formData.get("password");
 
-  if (typeof email !== "string" || typeof password !== "string") {
+  if (
+    typeof email !== "string" ||
+    typeof password !== "string" ||
+    !email.trim() ||
+    !password
+  ) {
     redirect("/login?error=invalid");
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: email.trim(),
     password,
   });
 
@@ -48,5 +53,5 @@ export async function login(formData: FormData) {
     redirect("/login?error=inactive");
   }
 
-  redirect("/account");
+  redirect(customer ? "/products" : "/");
 }

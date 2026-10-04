@@ -1,55 +1,70 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
-import { createClient } from "@/lib/supabase/server";
+import SubmitButton from "@/components/SubmitButton";
+import { Badge, PageHeader } from "@/components/ui";
+import { requireCustomer } from "@/lib/auth";
+import { priceGroupLabels } from "@/lib/format";
+
 import { logout } from "./actions";
 
+export const metadata: Metadata = {
+  title: "Hesab",
+};
+
 export default async function AccountPage() {
-  const supabase = await createClient();
+  const { user, customer } = await requireCustomer();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile, error } = await supabase
-    .from("customer_profiles")
-    .select("company_name, contact_name, price_group, active")
-    .eq("id", user.id)
-    .single();
-
-  if (error || !profile) {
-    return (
-      <main className="p-8">
-        <h1 className="text-2xl font-semibold">Profil tapılmadı</h1>
-      </main>
-    );
-  }
-  if (!profile.active) {
-  redirect("/login?error=inactive");
-}
+  const rows = [
+    ["Şirkət", customer.company_name ?? "—"],
+    ["Əlaqə şəxsi", customer.contact_name ?? "—"],
+    ["Telefon", customer.phone ?? "—"],
+    ["E-poçt", user.email ?? "—"],
+  ];
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">Müştəri hesabı</h1>
+    <>
+      <PageHeader title="Hesab" />
 
-      <div className="mt-6 space-y-2">
-        <p>Şirkət: {profile.company_name ?? "-"}</p>
-        <p>Ad: {profile.contact_name ?? "-"}</p>
-        <p>Qiymət qrupu: {profile.price_group}</p>
-        <p>Status: {profile.active ? "Aktiv" : "Deaktiv"}</p>
+      <div className="card max-w-2xl p-5 sm:p-6">
+        <dl className="divide-y divide-zinc-800">
+          {rows.map(([label, value]) => (
+            <div
+              key={label}
+              className="grid gap-1 py-3 sm:grid-cols-[160px_1fr]"
+            >
+              <dt className="text-sm text-zinc-400">{label}</dt>
+              <dd className="break-words text-zinc-100">{value}</dd>
+            </div>
+          ))}
+
+          <div className="grid gap-1 py-3 sm:grid-cols-[160px_1fr]">
+            <dt className="text-sm text-zinc-400">Qiymət qrupu</dt>
+            <dd>
+              <Badge tone="blue">
+                {priceGroupLabels[customer.price_group]}
+              </Badge>
+            </dd>
+          </div>
+
+          <div className="grid gap-1 py-3 sm:grid-cols-[160px_1fr]">
+            <dt className="text-sm text-zinc-400">Status</dt>
+            <dd>
+              <Badge tone="green">Aktiv</Badge>
+            </dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 text-xs text-zinc-500">
+          Məlumatları və ya qiymət qrupunu dəyişmək üçün administratorla
+          əlaqə saxlayın.
+        </p>
+
+        <form action={logout} className="mt-6">
+          <SubmitButton className="btn btn-secondary" pendingText="Çıxılır...">
+            Hesabdan çıx
+          </SubmitButton>
+        </form>
       </div>
-
-      <form action={logout} className="mt-8">
-        <button
-          type="submit"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-white"
-        >
-          Çıxış
-        </button>
-      </form>
-    </main>
+    </>
   );
 }

@@ -583,7 +583,9 @@ export type Database = {
       get_customer_cart: {
         Args: never
         Returns: {
+          available: boolean
           line_total: number
+          name: string
           product_id: string
           quantity: number
           sku: string

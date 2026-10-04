@@ -3,20 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  type ActionResult,
+  dbErrorMessage,
+  fail,
+  ok,
+} from "@/lib/action-result";
 import { createClient } from "@/lib/supabase/server";
 
-export async function changeCartQuantity(formData: FormData) {
-  const productId = formData.get("productId");
-  const delta = Number(formData.get("delta"));
-
-  if (
-    typeof productId !== "string" ||
-    !Number.isInteger(delta) ||
-    (delta !== 1 && delta !== -1)
-  ) {
-    return;
-  }
-
+async function getAuthedClient() {
   const supabase = await createClient();
 
   const {
@@ -26,6 +21,26 @@ export async function changeCartQuantity(formData: FormData) {
   if (!user) {
     redirect("/login");
   }
+
+  return supabase;
+}
+
+export async function changeCartQuantity(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const productId = formData.get("productId");
+  const delta = Number(formData.get("delta"));
+
+  if (
+    typeof productId !== "string" ||
+    !productId ||
+    (delta !== 1 && delta !== -1)
+  ) {
+    return fail("Yanlış sorğu.");
+  }
+
+  const supabase = await getAuthedClient();
 
   const { error } = await supabase.rpc("change_cart_quantity", {
     p_product_id: productId,
@@ -33,55 +48,56 @@ export async function changeCartQuantity(formData: FormData) {
   });
 
   if (error) {
-    throw new Error("Sepet miktarı güncellenemedi.");
+    return fail(dbErrorMessage(error, "Miqdar dəyişdirilmədi."));
   }
 
-  revalidatePath("/cart");
+  revalidatePath("/", "layout");
+
+  return ok("Miqdar yeniləndi.");
 }
 
-export async function removeFromCart(formData: FormData) {
+export async function removeFromCart(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
   const productId = formData.get("productId");
 
-  if (typeof productId !== "string") {
-    return;
+  if (typeof productId !== "string" || !productId) {
+    return fail("Yanlış sorğu.");
   }
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const supabase = await getAuthedClient();
 
   const { error } = await supabase.rpc("remove_from_cart", {
     p_product_id: productId,
   });
 
   if (error) {
-    throw new Error("Ürün sepetten silinemedi.");
+    return fail(dbErrorMessage(error, "Məhsul səbətdən silinmədi."));
   }
 
-  revalidatePath("/cart");
+  revalidatePath("/", "layout");
+
+  return ok("Məhsul səbətdən silindi.");
 }
-export async function createOrder() {
-  const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function createOrder(
+  _state: ActionResult,
+  _formData: FormData
+): Promise<ActionResult> {
+  void _formData;
 
-  if (!user) {
-    redirect("/login");
+  const supabase = await getAuthedClient();
+
+  const { data: orderId, error } = await supabase.rpc(
+    "create_order_from_cart"
+  );
+
+  if (error || !orderId) {
+    return fail(dbErrorMessage(error, "Sifariş yaradılmadı."));
   }
 
-  const { error } = await supabase.rpc("create_order_from_cart");
+  revalidatePath("/", "layout");
 
-  if (error) {
-    throw new Error("Sipariş oluşturulamadı.");
-  }
-
-  revalidatePath("/cart");
+  redirect(`/orders/${orderId}?created=1`);
 }

@@ -1,20 +1,27 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-import { createClient } from "@/lib/supabase/server";
-import { addToCart } from "./actions";
+import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
+import { requireCustomer } from "@/lib/auth";
+import { formatAzn } from "@/lib/format";
+import { signMediaPaths } from "@/lib/media";
 
-import ProductImageGallery from "./ProductImageGallery";
+import AddToCartForm from "./AddToCartForm";
 
-export default async function ProductsPage() {
-  const supabase = await createClient();
+export const metadata: Metadata = {
+  title: "Kataloq",
+};
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default async function ProductsPage({
+  searchParams,
+}: PageProps<"/products">) {
+  const params = await searchParams;
+  const selectedCategory =
+    typeof params.category === "string" ? params.category : "";
+  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const normalizedQuery = query.toLocaleLowerCase("az");
 
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase } = await requireCustomer();
 
   const { data: products, error } = await supabase.rpc(
     "get_customer_catalog"
@@ -22,172 +29,210 @@ export default async function ProductsPage() {
 
   if (error) {
     return (
-      <main className="p-8">
-        <h1 className="text-2xl font-semibold">
-          Məhsullar
-        </h1>
-
-        <p className="mt-4 text-red-600">
-          Məhsullar yüklənərkən xəta baş verdi.
-        </p>
-      </main>
+      <>
+        <PageHeader title="Kataloq" />
+        <Alert>
+          Məhsullar yüklənərkən xəta baş verdi. Səhifəni yeniləyin.
+        </Alert>
+      </>
     );
   }
 
-  const productsWithMedia = await Promise.all(
-    (products ?? []).map(async (product) => {
-      const { data: media } = await supabase.rpc(
-        "get_customer_product_media",
-        {
-          p_product_id: product.id,
-        }
-      );
-
-      const images = (media ?? []).filter(
-        (item) => item.media_type === "IMAGE"
-      );
-
-      const videos = (media ?? []).filter(
-        (item) => item.media_type === "VIDEO"
-      );
-
-      const imagesWithUrls = await Promise.all(
-        images.map(async (image) => {
-          const { data: signedUrlData } =
-            await supabase.storage
-              .from("product-media")
-              .createSignedUrl(
-                image.storage_path,
-                60 * 60
-              );
-
-          return {
-            ...image,
-            imageUrl:
-              signedUrlData?.signedUrl ?? null,
-          };
-        })
-      );
-
-      const videosWithUrls = await Promise.all(
-        videos.map(async (video) => {
-          const { data: signedUrlData } =
-            await supabase.storage
-              .from("product-media")
-              .createSignedUrl(
-                video.storage_path,
-                60 * 60
-              );
-
-          return {
-            ...video,
-            videoUrl:
-              signedUrlData?.signedUrl ?? null,
-          };
-        })
-      );
-
-      return {
-        ...product,
-        images: imagesWithUrls,
-        videos: videosWithUrls,
-      };
-    })
+  const allProducts = [...(products ?? [])].sort((a, b) =>
+    a.name.localeCompare(b.name, "az")
   );
 
+  const categories = [
+    ...new Map(
+      allProducts
+        .filter((product) => product.category_slug)
+        .map((product) => [
+          product.category_slug as string,
+          product.category_name ?? (product.category_slug as string),
+        ])
+    ),
+  ].sort((a, b) => a[1].localeCompare(b[1], "az"));
+
+  const visibleProducts = allProducts.filter((product) => {
+    if (selectedCategory && product.category_slug !== selectedCategory) {
+      return false;
+    }
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return [product.name, product.sku, product.description ?? ""].some(
+      (value) => value.toLocaleLowerCase("az").includes(normalizedQuery)
+    );
+  });
+
+  const imageUrls = await signMediaPaths(
+    supabase,
+    visibleProducts.map((product) => product.primary_image_path)
+  );
+
+  const categoryHref = (slug: string) => {
+    const search = new URLSearchParams();
+
+    if (slug) search.set("category", slug);
+    if (query) search.set("q", query);
+
+    const value = search.toString();
+
+    return value ? `/products?${value}` : "/products";
+  };
+
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">
-        Məhsullar
-      </h1>
+    <>
+      <PageHeader
+        title="Kataloq"
+        description="Qiymətlər sizin qiymət qrupunuza uyğun göstərilir."
+      />
 
-      {productsWithMedia.length === 0 ? (
-        <p className="mt-6">
-          Aktiv məhsul tapılmadı.
-        </p>
-      ) : (
-        <div className="mt-6 space-y-6">
-          {productsWithMedia.map((product) => (
-            <div
-              key={product.id}
-              className="rounded-xl border border-zinc-800 p-5"
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <nav
+          aria-label="Kateqoriyalar"
+          className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1"
+        >
+          <Link
+            href={categoryHref("")}
+            className={`btn btn-sm ${
+              selectedCategory ? "btn-secondary" : "btn-primary"
+            }`}
+          >
+            Hamısı
+          </Link>
+
+          {categories.map(([slug, name]) => (
+            <Link
+              key={slug}
+              href={categoryHref(slug)}
+              className={`btn btn-sm ${
+                selectedCategory === slug ? "btn-primary" : "btn-secondary"
+              }`}
             >
-              <ProductImageGallery
-                images={product.images}
-                productName={product.name}
-              />
+              {name}
+            </Link>
+          ))}
+        </nav>
 
-              {product.videos.length > 0 && (
-                <div className="mt-6">
-                  <p className="mb-3 font-semibold">
-                    Məhsul videosu
-                  </p>
+        <form action="/products" className="flex w-full gap-2 lg:w-96">
+          {selectedCategory && (
+            <input type="hidden" name="category" value={selectedCategory} />
+          )}
 
-                  <div className="flex flex-wrap gap-4">
-                    {product.videos.map((video) =>
-                      video.videoUrl ? (
-                        <video
-                          key={video.id}
-                          src={video.videoUrl}
-                          controls
-                          preload="metadata"
-                          className="w-full max-w-xl rounded-lg border border-zinc-800"
-                        />
-                      ) : null
+          <label htmlFor="catalog-search" className="sr-only">
+            Məhsul axtar
+          </label>
+
+          <input
+            id="catalog-search"
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder="Ad və ya SKU ilə axtar"
+            className="input"
+          />
+
+          <button type="submit" className="btn btn-secondary">
+            Axtar
+          </button>
+        </form>
+      </div>
+
+      {visibleProducts.length === 0 ? (
+        <EmptyState
+          title={
+            allProducts.length === 0
+              ? "Hazırda satışda məhsul yoxdur"
+              : "Uyğun məhsul tapılmadı"
+          }
+          description={
+            allProducts.length === 0
+              ? "Yeni məhsullar əlavə edildikdə burada görünəcək."
+              : "Başqa kateqoriya seçin və ya axtarış sözünü dəyişin."
+          }
+          action={
+            allProducts.length > 0 ? (
+              <Link href="/products" className="btn btn-secondary">
+                Filtrləri sıfırla
+              </Link>
+            ) : undefined
+          }
+        />
+      ) : (
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {visibleProducts.map((product) => {
+            const imageUrl = product.primary_image_path
+              ? imageUrls.get(product.primary_image_path)
+              : undefined;
+
+            return (
+              <li
+                key={product.id}
+                className="card flex min-w-0 flex-col overflow-hidden"
+              >
+                <Link
+                  href={`/products/${product.id}`}
+                  className="group block aspect-[4/3] bg-zinc-950"
+                >
+                  {imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imageUrl}
+                      alt={product.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-contain p-2 transition-transform group-hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <span className="grid h-full place-items-center text-sm text-zinc-600">
+                      Şəkil yoxdur
+                    </span>
+                  )}
+                </Link>
+
+                <div className="flex flex-1 flex-col gap-3 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {product.category_name && (
+                      <Badge>{product.category_name}</Badge>
+                    )}
+
+                    {product.stock > 0 ? (
+                      <Badge tone="green">Stokda: {product.stock}</Badge>
+                    ) : (
+                      <Badge tone="red">Stokda yoxdur</Badge>
                     )}
                   </div>
+
+                  <div className="min-w-0">
+                    <Link
+                      href={`/products/${product.id}`}
+                      className="line-clamp-2 font-semibold break-words text-white hover:text-amber-400"
+                    >
+                      {product.name}
+                    </Link>
+
+                    <p className="mt-1 truncate font-mono text-xs text-zinc-500">
+                      SKU: {product.sku}
+                    </p>
+                  </div>
+
+                  <p className="mt-auto text-xl font-bold text-amber-400">
+                    {formatAzn(product.price)}
+                  </p>
+
+                  <AddToCartForm
+                    productId={product.id}
+                    stock={product.stock}
+                  />
                 </div>
-              )}
-
-              <p className="mt-5 text-lg font-semibold">
-                {product.name}
-              </p>
-
-              <p className="mt-1 text-sm text-zinc-400">
-                SKU: {product.sku}
-              </p>
-
-              {product.description && (
-                <p className="mt-3 text-zinc-300">
-                  {product.description}
-                </p>
-              )}
-
-              <p className="mt-2 text-sm text-zinc-400">
-                Kategori:{" "}
-                {product.category_name ??
-                  "Kategorisiz"}
-              </p>
-
-              <p className="mt-2">
-                Stok: {product.stock}
-              </p>
-
-              <p className="mt-2 text-xl font-semibold">
-                {product.price} AZN
-              </p>
-
-              <form
-                action={addToCart}
-                className="mt-4"
-              >
-                <input
-                  type="hidden"
-                  name="productId"
-                  value={product.id}
-                />
-
-                <button
-                  type="submit"
-                  className="rounded-lg bg-white px-4 py-2 font-medium text-black"
-                >
-                  Sepete ekle
-                </button>
-              </form>
-            </div>
-          ))}
-        </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </main>
+    </>
   );
 }
