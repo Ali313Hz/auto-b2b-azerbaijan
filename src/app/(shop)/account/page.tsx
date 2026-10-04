@@ -30,14 +30,14 @@ export default async function AccountPage() {
           {rows.map(([label, value]) => (
             <div
               key={label}
-              className="grid gap-1 py-3 sm:grid-cols-[160px_1fr]"
+              className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[160px_1fr]"
             >
               <dt className="text-sm text-zinc-400">{label}</dt>
               <dd className="break-words text-zinc-100">{value}</dd>
             </div>
           ))}
 
-          <div className="grid gap-1 py-3 sm:grid-cols-[160px_1fr]">
+          <div className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[160px_1fr]">
             <dt className="text-sm text-zinc-400">Qiymət qrupu</dt>
             <dd>
               <Badge tone="blue">
@@ -46,7 +46,7 @@ export default async function AccountPage() {
             </dd>
           </div>
 
-          <div className="grid gap-1 py-3 sm:grid-cols-[160px_1fr]">
+          <div className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[160px_1fr]">
             <dt className="text-sm text-zinc-400">Status</dt>
             <dd>
               <Badge tone="green">Aktiv</Badge>

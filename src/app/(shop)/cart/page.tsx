@@ -83,7 +83,7 @@ export default async function CartPage() {
         </Alert>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px] lg:items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px] lg:items-start">
         <ul className="space-y-3">
           {cartItems.map((item) => (
             <li key={item.product_id} className="card p-4">

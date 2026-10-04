@@ -74,7 +74,7 @@ export default async function AdminProductsPage({
 
       <form
         action="/admin/products"
-        className="card mb-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_200px_160px_auto]"
+        className="card mb-6 grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_200px_160px_auto]"
       >
         <div>
           <label htmlFor="product-search" className="label">

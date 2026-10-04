@@ -109,7 +109,7 @@ export default async function AdminProductDetailPage({
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className="card p-5 sm:p-6">
           <h2 className="mb-4 font-semibold text-white">Əsas məlumatlar</h2>
 
@@ -129,6 +129,7 @@ export default async function AdminProductDetailPage({
 
             <Field label="Kateqoriya *" htmlFor="categoryId">
               <select
+                key={product.category_id ?? ""}
                 id="categoryId"
                 name="categoryId"
                 required
@@ -295,7 +296,7 @@ export default async function AdminProductDetailPage({
         </p>
 
         {videos.length > 0 ? (
-          <ul className="mt-4 grid gap-4 md:grid-cols-2">
+          <ul className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             {videos.map((video) => {
               const videoUrl = urls.get(video.storage_path);
 

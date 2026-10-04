@@ -90,7 +90,7 @@ export default async function AdminCustomerDetailPage({
         </Alert>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className="card p-5 sm:p-6">
           <h2 className="mb-4 font-semibold text-white">Şirkət məlumatları</h2>
 
@@ -162,6 +162,7 @@ export default async function AdminCustomerDetailPage({
                   <div className="w-48">
                     <Field label="Qiymət qrupu" htmlFor="priceGroup">
                       <select
+                        key={customer.price_group}
                         id="priceGroup"
                         name="priceGroup"
                         defaultValue={customer.price_group}
@@ -214,7 +215,7 @@ export default async function AdminCustomerDetailPage({
               <ActionForm
                 action={updateCustomerLogin}
                 resetOnSuccess
-                className="grid gap-4 sm:grid-cols-2"
+                className="grid grid-cols-1 gap-4 sm:grid-cols-2"
               >
                 <input type="hidden" name="customerId" value={customer.id} />
 

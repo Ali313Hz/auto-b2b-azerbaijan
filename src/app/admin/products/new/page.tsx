@@ -48,7 +48,7 @@ export default async function NewProductPage() {
         />
       ) : (
         <ActionForm action={createProduct} className="card max-w-3xl space-y-5 p-5 sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Məhsul adı *" htmlFor="name">
               <input id="name" name="name" required maxLength={200} className="input" />
             </Field>
@@ -62,7 +62,7 @@ export default async function NewProductPage() {
             <textarea id="description" name="description" rows={4} maxLength={5000} className="input" />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Kateqoriya *" htmlFor="categoryId">
               <select id="categoryId" name="categoryId" required defaultValue="" className="input">
                 <option value="" disabled>

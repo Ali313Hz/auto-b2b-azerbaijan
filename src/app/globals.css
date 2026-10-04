@@ -57,7 +57,9 @@ body {
   }
 
   .table-wrap {
-    @apply overflow-x-auto rounded-xl border border-zinc-800;
+    /* relative keeps absolutely positioned children (sr-only headers)
+       inside the scroll container instead of widening the page. */
+    @apply relative overflow-x-auto rounded-xl border border-zinc-800;
   }
 
   .table {

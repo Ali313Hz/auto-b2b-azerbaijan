@@ -34,7 +34,7 @@ export default async function NewCustomerPage() {
         action={createCustomer}
         className="card max-w-3xl space-y-5 p-5 sm:p-6"
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Şirkət adı *" htmlFor="companyName">
             <input id="companyName" name="companyName" required maxLength={200} className="input" />
           </Field>

@@ -46,7 +46,7 @@ export default async function AdminCategoriesPage() {
         description="Deaktiv kateqoriyanın məhsulları müştərilərə göstərilmir. Kateqoriyalar sifariş tarixçəsini qorumaq üçün silinmir."
       />
 
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr] lg:items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr] lg:items-start">
         <section className="card p-5">
           <h2 className="mb-4 font-semibold text-white">Yeni kateqoriya</h2>
 
@@ -113,7 +113,7 @@ export default async function AdminCategoriesPage() {
 
                   <ActionForm
                     action={updateCategory}
-                    className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_90px_130px_auto] lg:items-end"
+                    className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_90px_130px_auto] lg:items-end"
                   >
                     <input type="hidden" name="categoryId" value={category.id} />
 
@@ -153,7 +153,10 @@ export default async function AdminCategoriesPage() {
                     </Field>
 
                     <Field label="Status" htmlFor={`active-${category.id}`}>
+                      {/* Keyed so React's post-action form reset cannot
+                          show a stale option after the saved value changes. */}
                       <select
+                        key={String(category.active)}
                         id={`active-${category.id}`}
                         name="active"
                         defaultValue={category.active ? "true" : "false"}
