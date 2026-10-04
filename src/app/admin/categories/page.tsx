@@ -1,218 +1,177 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
-import { createClient } from "@/lib/supabase/server";
-import {
-  createCategory,
-  updateCategory,
-} from "./actions";
+import ActionForm from "@/components/ActionForm";
+import SubmitButton from "@/components/SubmitButton";
+import { Alert, Badge, EmptyState, Field, PageHeader } from "@/components/ui";
+import { requireOwner } from "@/lib/auth";
+
+import { createCategory, updateCategory } from "./actions";
+
+export const metadata: Metadata = {
+  title: "Kateqoriyalar",
+};
 
 export default async function AdminCategoriesPage() {
-  const supabase = await createClient();
+  const { supabase } = await requireOwner();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: staff } = await supabase
-    .from("staff_profiles")
-    .select("role, active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!staff || !staff.active || staff.role !== "OWNER") {
-    redirect("/");
-  }
-
-  const { data: categories, error } =
-    await supabase.rpc("get_admin_categories");
+  const [{ data: categories, error }, { data: products }] = await Promise.all([
+    supabase.rpc("get_admin_categories"),
+    supabase.rpc("get_admin_products"),
+  ]);
 
   if (error) {
     return (
-      <main className="p-8">
-        <h1 className="text-2xl font-semibold">
-          Kategoriler
-        </h1>
-
-        <p className="mt-4 text-red-500">
-          Kategoriler yüklenirken hata oluştu.
-        </p>
-      </main>
+      <>
+        <PageHeader title="Kateqoriyalar" />
+        <Alert>Kateqoriyalar yüklənərkən xəta baş verdi.</Alert>
+      </>
     );
   }
 
+  const productCounts = new Map<string, number>();
+
+  for (const product of products ?? []) {
+    if (product.category_id) {
+      productCounts.set(
+        product.category_id,
+        (productCounts.get(product.category_id) ?? 0) + 1
+      );
+    }
+  }
+
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">
-        Kategoriler
-      </h1>
+    <>
+      <PageHeader
+        title="Kateqoriyalar"
+        description="Deaktiv kateqoriyanın məhsulları müştərilərə göstərilmir. Kateqoriyalar sifariş tarixçəsini qorumaq üçün silinmir."
+      />
 
-      <form
-        action={createCategory}
-        className="mt-6 space-y-4 rounded-xl border border-zinc-800 p-5"
-      >
-        <h2 className="text-xl font-semibold">
-          Yeni Kategori Ekle
-        </h2>
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr] lg:items-start">
+        <section className="card p-5">
+          <h2 className="mb-4 font-semibold text-white">Yeni kateqoriya</h2>
 
-        <div>
-          <label className="block text-sm">
-            Kategori adı
-          </label>
+          <ActionForm action={createCategory} resetOnSuccess className="space-y-4">
+            <Field label="Ad *" htmlFor="new-name">
+              <input id="new-name" name="name" required maxLength={100} className="input" />
+            </Field>
 
-          <input
-            name="name"
-            required
-            className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">
-            Slug
-          </label>
-
-          <input
-            name="slug"
-            required
-            placeholder="ornek-kategori"
-            className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">
-            Sıralama
-          </label>
-
-          <input
-            type="number"
-            name="sortOrder"
-            min="0"
-            step="1"
-            required
-            defaultValue="0"
-            className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">
-            Durum
-          </label>
-
-          <select
-            name="active"
-            defaultValue="true"
-            className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          >
-            <option value="true">Aktif</option>
-            <option value="false">Deaktif</option>
-          </select>
-        </div>
-
-        <button
-          type="submit"
-          className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
-        >
-          Kategori Oluştur
-        </button>
-      </form>
-
-      {!categories || categories.length === 0 ? (
-        <p className="mt-8">
-          Kategori bulunamadı.
-        </p>
-      ) : (
-        <div className="mt-8 space-y-4">
-          {categories.map((category) => (
-            <form
-              key={category.id}
-              action={updateCategory}
-              className="space-y-4 rounded-xl border border-zinc-800 p-5"
+            <Field
+              label="Slug"
+              htmlFor="new-slug"
+              hint="Boş qalsa addan avtomatik yaradılır (məs. led-lampalar)."
             >
-              <input
-                type="hidden"
-                name="categoryId"
-                value={category.id}
-              />
+              <input id="new-slug" name="slug" maxLength={80} className="input font-mono" />
+            </Field>
 
-              <div>
-                <label className="block text-sm">
-                  Kategori adı
-                </label>
-
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Sıra" htmlFor="new-sort">
                 <input
-                  name="name"
-                  required
-                  defaultValue={category.name}
-                  className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm">
-                  Slug
-                </label>
-
-                <input
-                  name="slug"
-                  required
-                  defaultValue={category.slug}
-                  className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm">
-                  Sıralama
-                </label>
-
-                <input
+                  id="new-sort"
                   type="number"
                   name="sortOrder"
-                  min="0"
-                  step="1"
+                  min={0}
+                  step={1}
+                  defaultValue={0}
                   required
-                  defaultValue={category.sort_order}
-                  className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
+                  className="input"
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label className="block text-sm">
-                  Durum
-                </label>
-
-                <select
-                  name="active"
-                  defaultValue={
-                    category.active ? "true" : "false"
-                  }
-                  className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                >
-                  <option value="true">
-                    Aktif
-                  </option>
-                  <option value="false">
-                    Deaktif
-                  </option>
+              <Field label="Status" htmlFor="new-active">
+                <select id="new-active" name="active" defaultValue="true" className="input">
+                  <option value="true">Aktiv</option>
+                  <option value="false">Deaktiv</option>
                 </select>
-              </div>
+              </Field>
+            </div>
 
-              <button
-                type="submit"
-                className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
-              >
-                Kaydet
-              </button>
-            </form>
-          ))}
-        </div>
-      )}
-    </main>
+            <SubmitButton className="btn btn-primary w-full" pendingText="Yaradılır...">
+              Kateqoriya yarat
+            </SubmitButton>
+          </ActionForm>
+        </section>
+
+        <section>
+          {!categories || categories.length === 0 ? (
+            <EmptyState
+              title="Hələ kateqoriya yoxdur"
+              description="Soldakı formadan ilk kateqoriyanı yaradın."
+            />
+          ) : (
+            <ul className="space-y-3">
+              {categories.map((category) => (
+                <li key={category.id} className="card p-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-white">{category.name}</span>
+                    {category.active ? (
+                      <Badge tone="green">Aktiv</Badge>
+                    ) : (
+                      <Badge tone="red">Deaktiv</Badge>
+                    )}
+                    <Badge>{productCounts.get(category.id) ?? 0} məhsul</Badge>
+                  </div>
+
+                  <ActionForm
+                    action={updateCategory}
+                    className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_90px_130px_auto] lg:items-end"
+                  >
+                    <input type="hidden" name="categoryId" value={category.id} />
+
+                    <Field label="Ad" htmlFor={`name-${category.id}`}>
+                      <input
+                        id={`name-${category.id}`}
+                        name="name"
+                        required
+                        maxLength={100}
+                        defaultValue={category.name}
+                        className="input"
+                      />
+                    </Field>
+
+                    <Field label="Slug" htmlFor={`slug-${category.id}`}>
+                      <input
+                        id={`slug-${category.id}`}
+                        name="slug"
+                        required
+                        maxLength={80}
+                        defaultValue={category.slug}
+                        className="input font-mono"
+                      />
+                    </Field>
+
+                    <Field label="Sıra" htmlFor={`sort-${category.id}`}>
+                      <input
+                        id={`sort-${category.id}`}
+                        type="number"
+                        name="sortOrder"
+                        min={0}
+                        step={1}
+                        required
+                        defaultValue={category.sort_order}
+                        className="input"
+                      />
+                    </Field>
+
+                    <Field label="Status" htmlFor={`active-${category.id}`}>
+                      <select
+                        id={`active-${category.id}`}
+                        name="active"
+                        defaultValue={category.active ? "true" : "false"}
+                        className="input"
+                      >
+                        <option value="true">Aktiv</option>
+                        <option value="false">Deaktiv</option>
+                      </select>
+                    </Field>
+
+                    <SubmitButton pendingText="...">Yadda saxla</SubmitButton>
+                  </ActionForm>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </>
   );
 }

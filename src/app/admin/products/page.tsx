@@ -1,624 +1,234 @@
-import { redirect } from "next/navigation";
-import ProductVideoUpload from "./ProductVideoUpload";
-import { createClient } from "@/lib/supabase/server";
-import {
-  createProduct,
-  deleteProductImage,
-  deleteProductVideo,
-  setProductPrimaryImage,
-  updateProduct,
-  updateProductActive,
-  updateProductContent,
-  uploadProductImage,
-} from "./actions";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-export default async function AdminProductsPage() {
-  const supabase = await createClient();
+import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
+import { requireOwner } from "@/lib/auth";
+import { formatAzn } from "@/lib/format";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const metadata: Metadata = {
+  title: "Məhsullar",
+};
 
-  if (!user) {
-    redirect("/login");
-  }
+export default async function AdminProductsPage({
+  searchParams,
+}: PageProps<"/admin/products">) {
+  const params = await searchParams;
+  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const normalizedQuery = query.toLocaleLowerCase("az");
+  const categoryFilter =
+    typeof params.category === "string" ? params.category : "";
+  const statusFilter =
+    typeof params.status === "string" ? params.status : "";
+  const lowStockOnly = params.stock === "low";
 
-  const { data: staff } = await supabase
-    .from("staff_profiles")
-    .select("role, active")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { supabase } = await requireOwner();
 
-  if (!staff || !staff.active || staff.role !== "OWNER") {
-    redirect("/");
-  }
+  const [{ data: products, error }, { data: categories }] = await Promise.all(
+    [supabase.rpc("get_admin_products"), supabase.rpc("get_admin_categories")]
+  );
 
-  const { data: products, error: productsError } =
-    await supabase.rpc("get_admin_products");
-
- const { data: categories, error: categoriesError } =
-  await supabase.rpc("get_admin_categories");
-
-const productsWithMedia = await Promise.all(
-  (products ?? []).map(async (product) => {
-    const { data: media } = await supabase.rpc(
-      "get_admin_product_media",
-      {
-        p_product_id: product.id,
-      }
-    );
-
-    const images = (media ?? []).filter(
-      (item) => item.media_type === "IMAGE"
-    );
-
-    const videos = (media ?? []).filter(
-  (item) => item.media_type === "VIDEO"
-);
-
-    const imagesWithUrls = await Promise.all(
-      images.map(async (image) => {
-        const { data: signedUrlData } =
-          await supabase.storage
-            .from("product-media")
-            .createSignedUrl(
-              image.storage_path,
-              60 * 60
-            );
-
-        return {
-          ...image,
-          imageUrl:
-            signedUrlData?.signedUrl ?? null,
-        };
-      })
-    );
-
-    const videosWithUrls = await Promise.all(
-      videos.map(async (video) => {
-        const { data: signedUrlData } =
-          await supabase.storage
-            .from("product-media")
-            .createSignedUrl(
-              video.storage_path,
-              60 * 60
-            );
-
-        return {
-          ...video,
-          videoUrl:
-            signedUrlData?.signedUrl ?? null,
-        };
-      })
-    );
-
-    return {
-      ...product,
-      images: imagesWithUrls,
-      videos: videosWithUrls,
-    };
-  })
-);
-
-  if (productsError || categoriesError) {
+  if (error) {
     return (
-      <main className="p-8">
-        <h1 className="text-2xl font-semibold">Ürünler</h1>
-
-        <p className="mt-4 text-red-500">
-          Ürünler yüklenirken hata oluştu.
-        </p>
-      </main>
+      <>
+        <PageHeader title="Məhsullar" />
+        <Alert>Məhsullar yüklənərkən xəta baş verdi.</Alert>
+      </>
     );
   }
+
+  const allProducts = products ?? [];
+
+  const visibleProducts = allProducts.filter((product) => {
+    if (categoryFilter && product.category_id !== categoryFilter) {
+      return false;
+    }
+
+    if (statusFilter === "active" && !product.active) return false;
+    if (statusFilter === "inactive" && product.active) return false;
+    if (lowStockOnly && product.stock > 5) return false;
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return [product.name, product.sku].some((value) =>
+      value.toLocaleLowerCase("az").includes(normalizedQuery)
+    );
+  });
+
+  const hasFilters = Boolean(
+    query || categoryFilter || statusFilter || lowStockOnly
+  );
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">Ürünler</h1>
+    <>
+      <PageHeader
+        title="Məhsullar"
+        description={`${allProducts.length} məhsul`}
+        actions={
+          <Link href="/admin/products/new" className="btn btn-primary">
+            + Yeni məhsul
+          </Link>
+        }
+      />
 
       <form
-        action={createProduct}
-        className="mt-6 space-y-4 rounded-xl border border-zinc-800 p-5"
+        action="/admin/products"
+        className="card mb-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_200px_160px_auto]"
       >
-        <h2 className="text-xl font-semibold">
-          Yeni Ürün Ekle
-        </h2>
-
         <div>
-          <label className="block text-sm">SKU</label>
-
+          <label htmlFor="product-search" className="label">
+            Axtar
+          </label>
           <input
-            name="sku"
-            required
-            placeholder="Örnek: LED-H4-001"
-            className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+            id="product-search"
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder="Ad və ya SKU"
+            className="input"
           />
         </div>
 
         <div>
-          <label className="block text-sm">Kategori</label>
-
+          <label htmlFor="product-category" className="label">
+            Kateqoriya
+          </label>
           <select
-            name="categoryId"
-            required
-            defaultValue=""
-            className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+            id="product-category"
+            name="category"
+            defaultValue={categoryFilter}
+            className="input"
           >
-            <option value="" disabled>
-              Kategori seç
-            </option>
-
-            {categories?.map((category) => (
-              <option
-                key={category.id}
-                value={category.id}
-              >
+            <option value="">Hamısı</option>
+            {(categories ?? []).map((category) => (
+              <option key={category.id} value={category.id}>
                 {category.name}
-                {category.active ? "" : " (Deaktif)"}
               </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm">Stok</label>
-
-          <input
-            type="number"
-            name="stock"
-            min="0"
-            step="1"
-            required
-            className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">
-            NORMAL fiyat
+          <label htmlFor="product-status" className="label">
+            Status
           </label>
-
-          <input
-            type="number"
-            name="normalPrice"
-            min="0"
-            step="0.01"
-            required
-            className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">
-            DEALER fiyat
-          </label>
-
-          <input
-            type="number"
-            name="dealerPrice"
-            min="0"
-            step="0.01"
-            required
-            className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">
-            VIP fiyat
-          </label>
-
-          <input
-            type="number"
-            name="vipPrice"
-            min="0"
-            step="0.01"
-            required
-            className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm">
-            Durum
-          </label>
-
           <select
-            name="active"
-            defaultValue="true"
-            className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
+            id="product-status"
+            name="status"
+            defaultValue={statusFilter}
+            className="input"
           >
-            <option value="true">Aktif</option>
-            <option value="false">Deaktif</option>
+            <option value="">Hamısı</option>
+            <option value="active">Aktiv</option>
+            <option value="inactive">Deaktiv</option>
           </select>
         </div>
 
-        <button
-          type="submit"
-          className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
-        >
-          Ürün Oluştur
-        </button>
+        <div className="flex items-end gap-2">
+          {lowStockOnly && <input type="hidden" name="stock" value="low" />}
+          <button type="submit" className="btn btn-secondary">
+            Filtrlə
+          </button>
+          {hasFilters && (
+            <Link href="/admin/products" className="btn btn-secondary">
+              Sıfırla
+            </Link>
+          )}
+        </div>
       </form>
 
-      {productsWithMedia.length === 0 ? (
-        <p className="mt-6">Ürün bulunamadı.</p>
+      {lowStockOnly && (
+        <Alert tone="amber">Yalnız stoku 5 və daha az olan məhsullar.</Alert>
+      )}
+
+      {visibleProducts.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? "Uyğun məhsul tapılmadı" : "Hələ məhsul yoxdur"}
+          action={
+            hasFilters ? undefined : (
+              <Link href="/admin/products/new" className="btn btn-primary">
+                İlk məhsulu yarat
+              </Link>
+            )
+          }
+        />
       ) : (
-        <div className="mt-8 space-y-4">
-          {productsWithMedia.map((product) => (
-            <div
-              key={product.id}
-              className="rounded-xl border border-zinc-800 p-5"
-            >
-              <p className="text-lg font-semibold">
-  {product.name}
-</p>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Məhsul</th>
+                <th>Kateqoriya</th>
+                <th className="text-right">Stok</th>
+                <th className="text-right">Normal</th>
+                <th className="text-right">Diler</th>
+                <th className="text-right">VIP</th>
+                <th>Status</th>
+                <th className="sr-only">Əməliyyat</th>
+              </tr>
+            </thead>
 
-<p className="mt-1 text-sm text-zinc-400">
-  SKU: {product.sku}
-</p>
-
-{product.images.length > 0 && (
-  <div className="mt-5">
-    <p className="font-semibold">
-      Ürün Fotoğrafları
-    </p>
-
-    <div className="mt-3 flex flex-wrap gap-4">
-      {product.images.map((image) => (
-        <div
-          key={image.id}
-          className="w-56 rounded-lg border border-zinc-800 p-3"
-        >
-          {image.imageUrl && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.imageUrl}
-                alt={product.name}
-                className="h-40 w-full rounded-lg object-contain"
-              />
-            </>
-          )}
-
-          {image.is_primary ? (
-            <p className="mt-3 text-sm font-semibold text-green-500">
-              Ana fotoğraf
-            </p>
-          ) : (
-            <form
-              action={setProductPrimaryImage}
-              className="mt-3"
-            >
-              <input
-                type="hidden"
-                name="mediaId"
-                value={image.id}
-              />
-
-              <button
-                type="submit"
-                className="rounded-lg border border-zinc-700 px-3 py-2 text-sm"
-              >
-                Ana Fotoğraf Yap
-              </button>
-            </form>
-          )}
-
-          <form
-            action={deleteProductImage}
-            className="mt-2"
-          >
-            <input
-              type="hidden"
-              name="mediaId"
-              value={image.id}
-            />
-
-            <button
-              type="submit"
-              className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-500"
-            >
-              Fotoğrafı Sil
-            </button>
-          </form>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-{product.videos.length > 0 && (
-  <div className="mt-5">
-    <p className="font-semibold">
-      Ürün Videoları
-    </p>
-
-    <div className="mt-3 flex flex-wrap gap-4">
-      {product.videos.map((video) => (
-        <div
-          key={video.id}
-          className="w-80 rounded-lg border border-zinc-800 p-3"
-        >
-          {video.videoUrl && (
-            <video
-              src={video.videoUrl}
-              controls
-              preload="metadata"
-              className="w-full rounded-lg"
-            />
-          )}
-
-          {video.original_name && (
-            <p className="mt-2 truncate text-sm text-zinc-400">
-              {video.original_name}
-            </p>
-          )}
-
-          <form
-            action={deleteProductVideo}
-            className="mt-3"
-          >
-            <input
-              type="hidden"
-              name="mediaId"
-              value={video.id}
-            />
-
-            <button
-              type="submit"
-              className="rounded-lg border border-red-800 px-3 py-2 text-sm text-red-500"
-            >
-              Videoyu Sil
-            </button>
-          </form>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-              <p className="mt-2">
-                Kategori:{" "}
-                {product.category_name ?? "-"}
-              </p>
-
-              <p className="mt-2">
-                Durum:{" "}
-                {product.active ? "Aktif" : "Deaktif"}
-              </p>
-
-              <form
-  action={updateProductContent}
-  className="mt-5 space-y-4 rounded-lg border border-zinc-800 p-4"
->
-  <input
-    type="hidden"
-    name="productId"
-    value={product.id}
-  />
-
-  <div>
-    <label className="block text-sm">
-      Ürün adı
-    </label>
-
-    <input
-      name="name"
-      required
-      defaultValue={product.name}
-      className="mt-1 block w-full rounded-lg border border-zinc-700 bg-black px-3 py-2"
-    />
-  </div>
-
-  <div>
-    <label className="block text-sm">
-      Açıklama
-    </label>
-
-    <textarea
-      name="description"
-      rows={4}
-      defaultValue={product.description ?? ""}
-      className="mt-1 block w-full rounded-lg border border-zinc-700 bg-black px-3 py-2"
-    />
-  </div>
-
-  <div>
-    <label className="block text-sm">
-      Kategori
-    </label>
-
-    <select
-      name="categoryId"
-      required
-      defaultValue={product.category_id ?? ""}
-      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-    >
-      <option value="" disabled>
-        Kategori seç
-      </option>
-
-      {categories?.map((category) => (
-        <option
-          key={category.id}
-          value={category.id}
-        >
-          {category.name}
-          {category.active ? "" : " (Deaktif)"}
-        </option>
-      ))}
-    </select>
-  </div>
-
-  <button
-    type="submit"
-    className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
-  >
-    Ürün Bilgilerini Kaydet
-  </button>
-</form>
-
-<form
-  action={uploadProductImage}
-  className="mt-5 space-y-3 rounded-lg border border-zinc-800 p-4"
->
-  <input
-    type="hidden"
-    name="productId"
-    value={product.id}
-  />
-
-  <div>
-    <label className="block text-sm font-medium">
-      Ürün fotoğrafı
-    </label>
-
-    <input
-      type="file"
-      name="image"
-      accept="image/jpeg,image/png,image/webp"
-      required
-      className="mt-2 block"
-    />
-
-    <p className="mt-2 text-sm text-zinc-400">
-      JPG, PNG veya WEBP. En fazla 5 MB.
-    </p>
-  </div>
-
-
-
-
-  <button
-    type="submit"
-    className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
-  >
-    Fotoğraf Yükle
-  </button>
-</form>
-<ProductVideoUpload productId={product.id} />
-              <form
-                action={updateProductActive}
-                className="mt-3"
-              >
-                <input
-                  type="hidden"
-                  name="productId"
-                  value={product.id}
-                />
-
-                <input
-                  type="hidden"
-                  name="active"
-                  value={
-                    product.active
-                      ? "false"
-                      : "true"
-                  }
-                />
-
-                <button
-                  type="submit"
-                  className="rounded-lg border border-zinc-700 px-4 py-2"
-                >
-                  {product.active
-                    ? "Deaktif et"
-                    : "Aktif et"}
-                </button>
-              </form>
-
-              <form
-                action={updateProduct}
-                className="mt-5 space-y-4"
-              >
-                <input
-                  type="hidden"
-                  name="productId"
-                  value={product.id}
-                />
-
-                <div>
-                  <label className="block text-sm">
-                    Stok
-                  </label>
-
-                  <input
-                    type="number"
-                    name="stock"
-                    min="0"
-                    step="1"
-                    required
-                    defaultValue={product.stock}
-                    className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm">
-                    NORMAL fiyat
-                  </label>
-
-                  <input
-                    type="number"
-                    name="normalPrice"
-                    min="0"
-                    step="0.01"
-                    required
-                    defaultValue={
-                      product.normal_price ?? ""
-                    }
-                    className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm">
-                    DEALER fiyat
-                  </label>
-
-                  <input
-                    type="number"
-                    name="dealerPrice"
-                    min="0"
-                    step="0.01"
-                    required
-                    defaultValue={
-                      product.dealer_price ?? ""
-                    }
-                    className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm">
-                    VIP fiyat
-                  </label>
-
-                  <input
-                    type="number"
-                    name="vipPrice"
-                    min="0"
-                    step="0.01"
-                    required
-                    defaultValue={
-                      product.vip_price ?? ""
-                    }
-                    className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="rounded-lg bg-white px-5 py-2 font-semibold text-black"
-                >
-                  Kaydet
-                </button>
-              </form>
-            </div>
-          ))}
+            <tbody>
+              {visibleProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-zinc-900/60">
+                  <td className="max-w-xs">
+                    <Link
+                      href={`/admin/products/${product.id}`}
+                      className="block truncate font-medium text-white hover:text-amber-400"
+                    >
+                      {product.name}
+                    </Link>
+                    <span className="font-mono text-xs text-zinc-500">
+                      {product.sku}
+                    </span>
+                  </td>
+                  <td className="text-zinc-400">
+                    {product.category_name ?? "—"}
+                  </td>
+                  <td className="text-right">
+                    <span
+                      className={
+                        product.stock === 0
+                          ? "font-semibold text-red-400"
+                          : product.stock <= 5
+                            ? "font-semibold text-amber-400"
+                            : "text-zinc-200"
+                      }
+                    >
+                      {product.stock}
+                    </span>
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    {formatAzn(product.normal_price)}
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    {formatAzn(product.dealer_price)}
+                  </td>
+                  <td className="text-right whitespace-nowrap">
+                    {formatAzn(product.vip_price)}
+                  </td>
+                  <td>
+                    {product.active ? (
+                      <Badge tone="green">Aktiv</Badge>
+                    ) : (
+                      <Badge tone="red">Deaktiv</Badge>
+                    )}
+                  </td>
+                  <td className="text-right">
+                    <Link
+                      href={`/admin/products/${product.id}`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Redaktə
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </main>
+    </>
   );
 }

@@ -1,237 +1,153 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-import { createClient } from "@/lib/supabase/server";
+import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
+import { requireOwner } from "@/lib/auth";
+import {
+  formatAzn,
+  formatDate,
+  orderStatusLabels,
+  orderStatusTones,
+  priceGroupLabels,
+  shortId,
+} from "@/lib/format";
 
-import { updateOrderStatus } from "./actions";
+export const metadata: Metadata = {
+  title: "Sifarişlər",
+};
 
-const statusLabels = {
-  PENDING: "Bekliyor",
-  CONFIRMED: "Onaylandı",
-  CANCELLED: "İptal edildi",
-} as const;
+const statusTabs = [
+  { value: "", label: "Hamısı" },
+  { value: "PENDING", label: orderStatusLabels.PENDING },
+  { value: "CONFIRMED", label: orderStatusLabels.CONFIRMED },
+  { value: "CANCELLED", label: orderStatusLabels.CANCELLED },
+] as const;
 
-export default async function AdminOrdersPage() {
-  const supabase = await createClient();
+export default async function AdminOrdersPage({
+  searchParams,
+}: PageProps<"/admin/orders">) {
+  const params = await searchParams;
+  const statusFilter =
+    typeof params.status === "string" ? params.status : "";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase } = await requireOwner();
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: staff } = await supabase
-    .from("staff_profiles")
-    .select("role, active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!staff || !staff.active || staff.role !== "OWNER") {
-    redirect("/");
-  }
-
-  const { data: orders, error } = await supabase.rpc(
-    "get_admin_orders"
-  );
+  const { data: orders, error } = await supabase.rpc("get_admin_orders");
 
   if (error) {
     return (
-      <main className="p-8">
-        <h1 className="text-3xl font-semibold">
-          Siparişler
-        </h1>
-
-        <p className="mt-4 text-red-500">
-          Siparişler yüklenirken hata oluştu.
-        </p>
-      </main>
+      <>
+        <PageHeader title="Sifarişlər" />
+        <Alert>Sifarişlər yüklənərkən xəta baş verdi.</Alert>
+      </>
     );
   }
 
-  const ordersWithItems = await Promise.all(
-    (orders ?? []).map(async (order) => {
-      const { data: items, error: itemsError } =
-        await supabase.rpc("get_admin_order_items", {
-          p_order_id: order.order_id,
-        });
+  const allOrders = orders ?? [];
+  const visibleOrders = statusFilter
+    ? allOrders.filter((order) => order.status === statusFilter)
+    : allOrders;
 
-      return {
-        ...order,
-        items: items ?? [],
-        itemsError: Boolean(itemsError),
-      };
-    })
-  );
+  const countFor = (status: string) =>
+    status
+      ? allOrders.filter((order) => order.status === status).length
+      : allOrders.length;
 
   return (
-    <main className="p-8">
-      <h1 className="text-3xl font-semibold">
-        Siparişler
-      </h1>
+    <>
+      <PageHeader
+        title="Sifarişlər"
+        description="Gözləyən sifarişləri təsdiqləyin və ya ləğv edin. Ləğv zamanı stok avtomatik geri qaytarılır."
+      />
 
-      {ordersWithItems.length === 0 ? (
-        <p className="mt-8">
-          Henüz sipariş bulunmuyor.
-        </p>
+      <nav
+        aria-label="Status filtri"
+        className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1"
+      >
+        {statusTabs.map((tab) => (
+          <Link
+            key={tab.value}
+            href={tab.value ? `/admin/orders?status=${tab.value}` : "/admin/orders"}
+            className={`btn btn-sm ${
+              statusFilter === tab.value ? "btn-primary" : "btn-secondary"
+            }`}
+          >
+            {tab.label}
+            <span className="opacity-70">{countFor(tab.value)}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {visibleOrders.length === 0 ? (
+        <EmptyState
+          title={
+            allOrders.length === 0
+              ? "Hələ sifariş yoxdur"
+              : "Bu statusda sifariş yoxdur"
+          }
+        />
       ) : (
-        <div className="mt-8 space-y-6">
-          {ordersWithItems.map((order) => (
-            <div
-              key={order.order_id}
-              className="rounded-xl border border-zinc-800 p-6"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-lg font-semibold">
-                    Sipariş
-                  </p>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Sifariş</th>
+                <th>Müştəri</th>
+                <th>Tarix</th>
+                <th>Status</th>
+                <th className="text-right">Məhsul</th>
+                <th className="text-right">Məbləğ</th>
+                <th className="sr-only">Əməliyyat</th>
+              </tr>
+            </thead>
 
-                  <p className="mt-1 text-sm text-zinc-400">
-                    {order.order_id}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-zinc-400">
-                    Durum
-                  </p>
-
-                  <p className="mt-1 font-semibold">
-                    {statusLabels[order.status]}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-zinc-800 p-4">
-                  <p className="text-sm text-zinc-400">
-                    Müşteri
-                  </p>
-
-                  <p className="mt-1 font-semibold">
-                    {order.company_name ?? "-"}
-                  </p>
-
-                  <p className="mt-1">
-                    {order.contact_name ?? "-"}
-                  </p>
-
-                  <p className="mt-1 text-sm text-zinc-400">
-                    {order.email ?? "-"}
-                  </p>
-
-                  <p className="mt-2 text-sm">
-                    Fiyat grubu: {order.price_group}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-zinc-800 p-4">
-                  <p>
-                    Ürün sayısı: {order.item_count}
-                  </p>
-
-                  <p className="mt-2 text-xl font-semibold">
-                    Toplam: {order.total_amount} AZN
-                  </p>
-
-                  <p className="mt-2 text-sm text-zinc-400">
-                    Tarih:{" "}
-                    {new Date(
-                      order.created_at
-                    ).toLocaleString("tr-TR")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 border-t border-zinc-800 pt-5">
-                <h2 className="font-semibold">
-                  Sipariş Ürünleri
-                </h2>
-
-                {order.itemsError ? (
-                  <p className="mt-3 text-red-500">
-                    Sipariş ürünleri yüklenemedi.
-                  </p>
-                ) : (
-                  <div className="mt-4 space-y-3">
-                    {order.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-lg bg-zinc-950 p-4"
-                      >
-                        <p className="font-semibold">
-                          {item.sku}
-                        </p>
-
-                        <p className="mt-1">
-                          Adet: {item.quantity}
-                        </p>
-
-                        <p className="mt-1">
-                          Birim fiyat:{" "}
-                          {item.unit_price} AZN
-                        </p>
-
-                        <p className="mt-1 font-semibold">
-                          Ara toplam:{" "}
-                          {item.line_total} AZN
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {order.status === "PENDING" && (
-                <div className="mt-6 flex flex-wrap gap-3 border-t border-zinc-800 pt-5">
-                  <form action={updateOrderStatus}>
-                    <input
-                      type="hidden"
-                      name="orderId"
-                      value={order.order_id}
-                    />
-
-                    <input
-                      type="hidden"
-                      name="status"
-                      value="CONFIRMED"
-                    />
-
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-white px-4 py-2 font-semibold text-black"
+            <tbody>
+              {visibleOrders.map((order) => (
+                <tr key={order.order_id} className="hover:bg-zinc-900/60">
+                  <td>
+                    <Link
+                      href={`/admin/orders/${order.order_id}`}
+                      className="font-mono font-medium text-white hover:text-amber-400"
                     >
-                      Siparişi Onayla
-                    </button>
-                  </form>
-
-                  <form action={updateOrderStatus}>
-                    <input
-                      type="hidden"
-                      name="orderId"
-                      value={order.order_id}
-                    />
-
-                    <input
-                      type="hidden"
-                      name="status"
-                      value="CANCELLED"
-                    />
-
-                    <button
-                      type="submit"
-                      className="rounded-lg border border-red-800 px-4 py-2 font-semibold text-red-500"
+                      #{shortId(order.order_id)}
+                    </Link>
+                  </td>
+                  <td className="max-w-56">
+                    <span className="block truncate text-zinc-200">
+                      {order.company_name ?? "—"}
+                    </span>
+                    <span className="text-xs text-zinc-500">
+                      {priceGroupLabels[order.price_group]}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap text-zinc-400">
+                    {formatDate(order.created_at)}
+                  </td>
+                  <td>
+                    <Badge tone={orderStatusTones[order.status]}>
+                      {orderStatusLabels[order.status]}
+                    </Badge>
+                  </td>
+                  <td className="text-right">{order.item_count}</td>
+                  <td className="text-right font-semibold whitespace-nowrap text-white">
+                    {formatAzn(order.total_amount)}
+                  </td>
+                  <td className="text-right">
+                    <Link
+                      href={`/admin/orders/${order.order_id}`}
+                      className={`btn btn-sm ${
+                        order.status === "PENDING" ? "btn-primary" : "btn-secondary"
+                      }`}
                     >
-                      Siparişi İptal Et
-                    </button>
-                  </form>
-                </div>
-              )}
-            </div>
-          ))}
+                      {order.status === "PENDING" ? "Bax və təsdiqlə" : "Ətraflı"}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </main>
+    </>
   );
 }

@@ -1,39 +1,31 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-import { createClient } from "@/lib/supabase/server";
+import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
+import { requireOwner } from "@/lib/auth";
+import { priceGroupLabels } from "@/lib/format";
 
-import DeleteCustomerButton from "./DeleteCustomerButton";
+export const metadata: Metadata = {
+  title: "Müştərilər",
+};
 
-import {
-  archiveCustomer,
-  createCustomer,
-  restoreCustomer,
-  updateCustomerActive,
-  updateCustomerLogin,
-  updateCustomerPriceGroup,
-  updateCustomerProfile,
-} from "./actions";
+const statusFilters = [
+  { value: "", label: "Hamısı" },
+  { value: "active", label: "Aktiv" },
+  { value: "inactive", label: "Deaktiv" },
+  { value: "archived", label: "Arxiv" },
+];
 
-export default async function AdminCustomersPage() {
-  const supabase = await createClient();
+export default async function AdminCustomersPage({
+  searchParams,
+}: PageProps<"/admin/customers">) {
+  const params = await searchParams;
+  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const normalizedQuery = query.toLocaleLowerCase("az");
+  const statusFilter =
+    typeof params.status === "string" ? params.status : "";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: staff } = await supabase
-    .from("staff_profiles")
-    .select("role, active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!staff || !staff.active || staff.role !== "OWNER") {
-    redirect("/");
-  }
+  const { supabase } = await requireOwner();
 
   const { data: customers, error } = await supabase.rpc(
     "get_admin_customers"
@@ -41,414 +33,170 @@ export default async function AdminCustomersPage() {
 
   if (error) {
     return (
-      <main className="p-8">
-        <h1 className="text-2xl font-semibold">Müşteriler</h1>
-
-        <p className="mt-4 text-red-500">
-          Müşteriler yüklenirken hata oluştu.
-        </p>
-      </main>
+      <>
+        <PageHeader title="Müştərilər" />
+        <Alert>Müştərilər yüklənərkən xəta baş verdi.</Alert>
+      </>
     );
   }
 
+  const allCustomers = customers ?? [];
+
+  const visibleCustomers = allCustomers.filter((customer) => {
+    const archived = customer.archived_at !== null;
+
+    if (statusFilter === "active" && (!customer.active || archived)) return false;
+    if (statusFilter === "inactive" && (customer.active || archived)) return false;
+    if (statusFilter === "archived" && !archived) return false;
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return [customer.company_name, customer.contact_name, customer.email, customer.phone]
+      .filter(Boolean)
+      .some((value) =>
+        String(value).toLocaleLowerCase("az").includes(normalizedQuery)
+      );
+  });
+
   return (
-    <main className="p-8">
-      <h1 className="text-3xl font-semibold">Müşteriler</h1>
+    <>
+      {params.notice === "deleted" && (
+        <Alert tone="green">Müştəri həmişəlik silindi.</Alert>
+      )}
 
-      <div className="mt-8 rounded-xl border border-zinc-800 p-6">
-        <h2 className="text-2xl font-semibold">
-          Yeni Müşteri Ekle
-        </h2>
-
-        <form action={createCustomer} className="mt-6 space-y-5">
-          <div>
-            <label className="block text-sm">E-posta</label>
-
-            <input
-              type="email"
-              name="email"
-              required
-              autoComplete="off"
-              className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm">
-              Geçici şifre
-            </label>
-
-            <input
-              type="password"
-              name="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-            />
-
-            <p className="mt-1 text-xs text-zinc-400">
-              En az 8 karakter.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm">Şirket adı</label>
-
-            <input
-              name="companyName"
-              required
-              className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm">Yetkili kişi</label>
-
-            <input
-              name="contactName"
-              required
-              className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm">Telefon</label>
-
-            <input
-              type="tel"
-              name="phone"
-              className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm">Fiyat grubu</label>
-
-            <select
-              name="priceGroup"
-              defaultValue="NORMAL"
-              className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-            >
-              <option value="NORMAL">NORMAL</option>
-              <option value="DEALER">DEALER</option>
-              <option value="VIP">VIP</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm">Durum</label>
-
-            <select
-              name="active"
-              defaultValue="true"
-              className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-            >
-              <option value="true">Aktif</option>
-              <option value="false">Deaktif</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="rounded-lg bg-white px-5 py-3 font-semibold text-black"
-          >
-            Müşteri Oluştur
-          </button>
-        </form>
-      </div>
-
-      {!customers || customers.length === 0 ? (
-        <p className="mt-8">Müşteri bulunamadı.</p>
-      ) : (
-        <div className="mt-8 space-y-6">
-          {customers.map((customer) => {
-            const isArchived = customer.archived_at !== null;
-
-            return (
-              <div
-                key={customer.id}
-                className="rounded-xl border border-zinc-800 p-6"
-              >
-                {isArchived && (
-                  <div className="mb-6 rounded-lg border border-amber-800 bg-amber-950/30 p-4">
-                    <p className="font-semibold text-amber-300">
-                      Arşivlenmiş müşteri
-                    </p>
-
-                    <p className="mt-1 text-sm text-zinc-400">
-                      Bu müşteri giriş yapamaz ve aktif hale
-                      getirilemez.
-                    </p>
-                  </div>
-                )}
-<div className="mb-6 rounded-lg border border-zinc-800 p-4">
-  <p className="text-sm text-zinc-400">
-    E-posta
-  </p>
-
-  <p className="mt-1 font-medium">
-    {customer.email}
-  </p>
-
-  <p className="mt-2 text-sm text-zinc-400">
-    Sipariş sayısı: {customer.order_count}
-  </p>
-</div>
-                <form
-                  action={updateCustomerProfile}
-                  className="space-y-4"
-                >
-                  <input
-                    type="hidden"
-                    name="customerId"
-                    value={customer.id}
-                  />
-
-                  <div>
-                    <label className="block text-sm">
-                      Şirket adı
-                    </label>
-
-                    <input
-                      name="companyName"
-                      required
-                      disabled={isArchived}
-                      defaultValue={customer.company_name ?? ""}
-                      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2 disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm">
-                      Yetkili kişi
-                    </label>
-
-                    <input
-                      name="contactName"
-                      required
-                      disabled={isArchived}
-                      defaultValue={customer.contact_name ?? ""}
-                      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2 disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm">
-                      Telefon
-                    </label>
-
-                    <input
-                      type="tel"
-                      name="phone"
-                      disabled={isArchived}
-                      defaultValue={customer.phone ?? ""}
-                      className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2 disabled:opacity-50"
-                    />
-                  </div>
-
-                  {!isArchived && (
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-white px-4 py-2 font-medium text-black"
-                    >
-                      Bilgileri Kaydet
-                    </button>
-                  )}
-                </form>
-
-                {!isArchived && (
-                  <form
-                    action={updateCustomerLogin}
-                    className="mt-6 space-y-4 border-t border-zinc-800 pt-5"
-                  >
-                    <input
-                      type="hidden"
-                      name="customerId"
-                      value={customer.id}
-                    />
-
-                    <h3 className="font-semibold">
-                      Giriş Bilgileri
-                    </h3>
-                    <p className="text-sm text-zinc-400">
-  Mevcut e-posta: {customer.email}
-</p>
-
-                    <div>
-                      <label className="block text-sm">
-                        Yeni e-posta
-                      </label>
-
-                      <input
-                        type="email"
-                        name="email"
-                        placeholder="Değişmeyecekse boş bırak"
-                        autoComplete="off"
-                        className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm">
-                        Yeni şifre
-                      </label>
-
-                      <input
-                        type="password"
-                        name="password"
-                        minLength={8}
-                        placeholder="Değişmeyecekse boş bırak"
-                        autoComplete="new-password"
-                        className="mt-1 block rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                      />
-
-                      <p className="mt-1 text-xs text-zinc-400">
-                        Yeni şifre girilecekse en az 8 karakter
-                        olmalıdır.
-                      </p>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="rounded-lg border border-zinc-700 px-4 py-2"
-                    >
-                      Giriş Bilgilerini Güncelle
-                    </button>
-                  </form>
-                )}
-
-                <div className="mt-6 border-t border-zinc-800 pt-5">
-                  <p>
-                    Durum:{" "}
-                    {isArchived
-                      ? "Arşivde"
-                      : customer.active
-                        ? "Aktif"
-                        : "Deaktif"}
-                  </p>
-
-                  {!isArchived && (
-                    <form
-                      action={updateCustomerActive}
-                      className="mt-3"
-                    >
-                      <input
-                        type="hidden"
-                        name="customerId"
-                        value={customer.id}
-                      />
-
-                      <input
-                        type="hidden"
-                        name="active"
-                        value={
-                          customer.active ? "false" : "true"
-                        }
-                      />
-
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-zinc-700 px-4 py-2"
-                      >
-                        {customer.active
-                          ? "Deaktif et"
-                          : "Aktif et"}
-                      </button>
-                    </form>
-                  )}
-                </div>
-
-                {!isArchived && (
-                  <form
-                    action={updateCustomerPriceGroup}
-                    className="mt-5 flex flex-wrap items-end gap-3"
-                  >
-                    <input
-                      type="hidden"
-                      name="customerId"
-                      value={customer.id}
-                    />
-
-                    <div>
-                      <label className="block text-sm">
-                        Fiyat grubu
-                      </label>
-
-                      <select
-                        name="priceGroup"
-                        defaultValue={customer.price_group}
-                        className="mt-1 rounded-lg border border-zinc-700 bg-black px-3 py-2"
-                      >
-                        <option value="NORMAL">NORMAL</option>
-                        <option value="DEALER">DEALER</option>
-                        <option value="VIP">VIP</option>
-                      </select>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-white px-4 py-2 font-medium text-black"
-                    >
-                      Fiyat Grubunu Kaydet
-                    </button>
-                  </form>
-                )}
-
-                <div className="mt-6 border-t border-zinc-800 pt-5">
-
-
-                  {isArchived ? (
-  <div>
-    <form action={restoreCustomer}>
-      <input
-        type="hidden"
-        name="customerId"
-        value={customer.id}
+      <PageHeader
+        title="Müştərilər"
+        description={`${allCustomers.length} müştəri`}
+        actions={
+          <Link href="/admin/customers/new" className="btn btn-primary">
+            + Yeni müştəri
+          </Link>
+        }
       />
 
-      <button
-        type="submit"
-        className="rounded-lg border border-emerald-800 px-4 py-2 text-emerald-400"
+      <form
+        action="/admin/customers"
+        className="card mb-6 flex flex-wrap items-end gap-3 p-4"
       >
-        Arşivden Çıkar
-      </button>
-    </form>
+        <div className="min-w-0 flex-1 basis-60">
+          <label htmlFor="customer-search" className="label">
+            Axtar
+          </label>
+          <input
+            id="customer-search"
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder="Şirkət, ad, e-poçt və ya telefon"
+            className="input"
+          />
+        </div>
 
-    {customer.can_permanently_delete && (
-      <div className="mt-3">
-        <DeleteCustomerButton
-          customerId={customer.id}
-          companyName={customer.company_name}
+        <div className="w-40">
+          <label htmlFor="customer-status" className="label">
+            Status
+          </label>
+          <select
+            id="customer-status"
+            name="status"
+            defaultValue={statusFilter}
+            className="input"
+          >
+            {statusFilters.map((filter) => (
+              <option key={filter.value} value={filter.value}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button type="submit" className="btn btn-secondary">
+          Filtrlə
+        </button>
+      </form>
+
+      {visibleCustomers.length === 0 ? (
+        <EmptyState
+          title={
+            allCustomers.length === 0
+              ? "Hələ müştəri yoxdur"
+              : "Uyğun müştəri tapılmadı"
+          }
+          action={
+            allCustomers.length === 0 ? (
+              <Link href="/admin/customers/new" className="btn btn-primary">
+                İlk müştərini yarat
+              </Link>
+            ) : undefined
+          }
         />
-      </div>
-    )}
-  </div>
-) : (
+      ) : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Şirkət</th>
+                <th>Əlaqə</th>
+                <th>Qrup</th>
+                <th>Status</th>
+                <th className="text-right">Sifariş</th>
+                <th className="sr-only">Əməliyyat</th>
+              </tr>
+            </thead>
 
-
-
-                    <form action={archiveCustomer}>
-                      <input
-                        type="hidden"
-                        name="customerId"
-                        value={customer.id}
-                      />
-
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-amber-800 px-4 py-2 text-amber-400"
-                      >
-                        Müşteriyi Arşivle
-                      </button>
-                    </form>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+            <tbody>
+              {visibleCustomers.map((customer) => (
+                <tr key={customer.id} className="hover:bg-zinc-900/60">
+                  <td className="max-w-xs">
+                    <Link
+                      href={`/admin/customers/${customer.id}`}
+                      className="block truncate font-medium text-white hover:text-amber-400"
+                    >
+                      {customer.company_name ?? "—"}
+                    </Link>
+                    <span className="block truncate text-xs text-zinc-500">
+                      {customer.email ?? "—"}
+                    </span>
+                  </td>
+                  <td className="text-zinc-300">
+                    {customer.contact_name ?? "—"}
+                    {customer.phone && (
+                      <span className="block text-xs text-zinc-500">
+                        {customer.phone}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <Badge tone="blue">
+                      {priceGroupLabels[customer.price_group]}
+                    </Badge>
+                  </td>
+                  <td>
+                    {customer.archived_at ? (
+                      <Badge tone="amber">Arxivdə</Badge>
+                    ) : customer.active ? (
+                      <Badge tone="green">Aktiv</Badge>
+                    ) : (
+                      <Badge tone="red">Deaktiv</Badge>
+                    )}
+                  </td>
+                  <td className="text-right">{customer.order_count}</td>
+                  <td className="text-right">
+                    <Link
+                      href={`/admin/customers/${customer.id}`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      İdarə et
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </main>
+    </>
   );
 }

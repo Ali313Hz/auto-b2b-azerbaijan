@@ -1,281 +1,280 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
+import {
+  type ActionResult,
+  dbErrorMessage,
+  fail,
+  ok,
+} from "@/lib/action-result";
 import { createClient } from "@/lib/supabase/server";
 
-export async function updateProduct(formData: FormData) {
-  const productId = formData.get("productId");
-  const stockValue = formData.get("stock");
-  const normalPriceValue = formData.get("normalPrice");
-  const dealerPriceValue = formData.get("dealerPrice");
-  const vipPriceValue = formData.get("vipPrice");
+async function getAuthedClient() {
+  const supabase = await createClient();
 
-  if (
-    typeof productId !== "string" ||
-    typeof stockValue !== "string" ||
-    typeof normalPriceValue !== "string" ||
-    typeof dealerPriceValue !== "string" ||
-    typeof vipPriceValue !== "string"
-  ) {
-    throw new Error("Geçersiz ürün bilgisi.");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
   }
 
-  const stock = Number(stockValue);
-  const normalPrice = Number(normalPriceValue);
-  const dealerPrice = Number(dealerPriceValue);
-  const vipPrice = Number(vipPriceValue);
+  return supabase;
+}
+
+function revalidateProductPaths(productId?: string) {
+  revalidatePath("/admin/products");
+  revalidatePath("/admin");
+  revalidatePath("/products");
+  revalidatePath("/cart");
+
+  if (productId) {
+    revalidatePath(`/admin/products/${productId}`);
+    revalidatePath(`/products/${productId}`);
+  }
+}
+
+function readText(formData: FormData, key: string) {
+  const value = formData.get(key);
+
+  return typeof value === "string" ? value.trim() : null;
+}
+
+function parseStockAndPrices(formData: FormData) {
+  const values = {
+    stock: readText(formData, "stock"),
+    normalPrice: readText(formData, "normalPrice"),
+    dealerPrice: readText(formData, "dealerPrice"),
+    vipPrice: readText(formData, "vipPrice"),
+  };
+
+  if (Object.values(values).some((value) => !value)) {
+    return null;
+  }
+
+  const stock = Number(values.stock);
+  const prices = [
+    Number(values.normalPrice),
+    Number(values.dealerPrice),
+    Number(values.vipPrice),
+  ];
 
   if (
     !Number.isInteger(stock) ||
     stock < 0 ||
-    !Number.isFinite(normalPrice) ||
-    normalPrice < 0 ||
-    !Number.isFinite(dealerPrice) ||
-    dealerPrice < 0 ||
-    !Number.isFinite(vipPrice) ||
-    vipPrice < 0
+    prices.some((price) => !Number.isFinite(price) || price < 0)
   ) {
-    throw new Error("Stok veya fiyat değerleri geçersiz.");
+    return null;
   }
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
-
-  const { error } = await supabase.rpc("update_admin_product", {
-    p_product_id: productId,
-    p_stock: stock,
-    p_normal_price: normalPrice,
-    p_dealer_price: dealerPrice,
-    p_vip_price: vipPrice,
-  });
-
-  if (error) {
-    throw new Error("Ürün güncellenemedi.");
-  }
-
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
-  revalidatePath("/cart");
+  return {
+    stock,
+    normalPrice: prices[0],
+    dealerPrice: prices[1],
+    vipPrice: prices[2],
+  };
 }
-export async function updateProductActive(formData: FormData) {
-  const productId = formData.get("productId");
-  const activeValue = formData.get("active");
 
-  if (
-    typeof productId !== "string" ||
-    typeof activeValue !== "string"
-  ) {
-    throw new Error("Geçersiz ürün bilgisi.");
+export async function createProduct(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const sku = readText(formData, "sku");
+  const name = readText(formData, "name");
+  const description = readText(formData, "description") ?? "";
+  const categoryId = readText(formData, "categoryId");
+  const activeValue = readText(formData, "active");
+  const numbers = parseStockAndPrices(formData);
+
+  if (!sku || !name || !categoryId) {
+    return fail("Ad, SKU və kateqoriya mütləqdir.");
   }
 
-  const active = activeValue === "true";
-
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
+  if (!numbers) {
+    return fail("Stok tam ədəd, qiymətlər isə 0 və ya daha böyük olmalıdır.");
   }
 
-  const { error } = await supabase.rpc(
-    "update_admin_product_active",
+  if (activeValue !== "true" && activeValue !== "false") {
+    return fail("Status yanlışdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { data: productId, error } = await supabase.rpc(
+    "create_admin_product",
     {
-      p_product_id: productId,
-      p_active: active,
+      p_sku: sku,
+      p_category_id: categoryId,
+      p_stock: numbers.stock,
+      p_normal_price: numbers.normalPrice,
+      p_dealer_price: numbers.dealerPrice,
+      p_vip_price: numbers.vipPrice,
+      p_active: activeValue === "true",
     }
   );
 
-  if (error) {
-    throw new Error("Ürün durumu güncellenemedi.");
+  if (error || !productId) {
+    return fail(dbErrorMessage(error, "Məhsul yaradılmadı."));
   }
 
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
-  revalidatePath("/cart");
-}
-export async function createProduct(formData: FormData) {
-  const skuValue = formData.get("sku");
-  const categoryId = formData.get("categoryId");
-  const stockValue = formData.get("stock");
-  const normalPriceValue = formData.get("normalPrice");
-  const dealerPriceValue = formData.get("dealerPrice");
-  const vipPriceValue = formData.get("vipPrice");
-  const activeValue = formData.get("active");
-
-  if (
-    typeof skuValue !== "string" ||
-    typeof categoryId !== "string" ||
-    typeof stockValue !== "string" ||
-    typeof normalPriceValue !== "string" ||
-    typeof dealerPriceValue !== "string" ||
-    typeof vipPriceValue !== "string" ||
-    typeof activeValue !== "string"
-  ) {
-    throw new Error("Geçersiz ürün bilgisi.");
-  }
-
-  const sku = skuValue.trim();
-  const stock = Number(stockValue);
-  const normalPrice = Number(normalPriceValue);
-  const dealerPrice = Number(dealerPriceValue);
-  const vipPrice = Number(vipPriceValue);
-  const active = activeValue === "true";
-
-  if (
-    !sku ||
-    !categoryId ||
-    !Number.isInteger(stock) ||
-    stock < 0 ||
-    !Number.isFinite(normalPrice) ||
-    normalPrice < 0 ||
-    !Number.isFinite(dealerPrice) ||
-    dealerPrice < 0 ||
-    !Number.isFinite(vipPrice) ||
-    vipPrice < 0
-  ) {
-    throw new Error("Ürün bilgileri geçersiz.");
-  }
-
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
-
-  const { error } = await supabase.rpc("create_admin_product", {
-    p_sku: sku,
-    p_category_id: categoryId,
-    p_stock: stock,
-    p_normal_price: normalPrice,
-    p_dealer_price: dealerPrice,
-    p_vip_price: vipPrice,
-    p_active: active,
-  });
-
-  if (error) {
-    throw new Error("Ürün oluşturulamadı.");
-  }
-
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
-}
-
-export async function updateProductContent(formData: FormData) {
-  const productId = formData.get("productId");
-  const nameValue = formData.get("name");
-  const descriptionValue = formData.get("description");
-  const categoryIdValue = formData.get("categoryId");
-
-  if (
-  typeof productId !== "string" ||
-  typeof nameValue !== "string" ||
-  typeof descriptionValue !== "string" ||
-  typeof categoryIdValue !== "string" ||
-  !categoryIdValue
-) {
-  throw new Error("Geçersiz ürün bilgisi.");
-}
-
-  const name = nameValue.trim();
-  const description = descriptionValue.trim();
-
-  if (!name) {
-    throw new Error("Ürün adı gereklidir.");
-  }
-
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
-
-  const { error } = await supabase.rpc(
+  const { error: contentError } = await supabase.rpc(
     "update_admin_product_content",
     {
       p_product_id: productId,
       p_name: name,
       p_description: description,
-      p_category_id: categoryIdValue,
+      p_category_id: categoryId,
     }
   );
 
-  if (error) {
-    throw new Error("Ürün bilgileri güncellenemedi.");
+  revalidateProductPaths(productId);
+
+  if (contentError) {
+    redirect(`/admin/products/${productId}?notice=content-failed`);
   }
 
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
+  redirect(`/admin/products/${productId}?notice=created`);
 }
 
-export async function uploadProductImage(formData: FormData) {
-  const productId = formData.get("productId");
+export async function updateProduct(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const productId = readText(formData, "productId");
+  const numbers = parseStockAndPrices(formData);
+
+  if (!productId) {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
+
+  if (!numbers) {
+    return fail("Stok tam ədəd, qiymətlər isə 0 və ya daha böyük olmalıdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("update_admin_product", {
+    p_product_id: productId,
+    p_stock: numbers.stock,
+    p_normal_price: numbers.normalPrice,
+    p_dealer_price: numbers.dealerPrice,
+    p_vip_price: numbers.vipPrice,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Stok və qiymətlər yenilənmədi."));
+  }
+
+  revalidateProductPaths(productId);
+
+  return ok("Stok və qiymətlər yadda saxlandı.");
+}
+
+export async function updateProductActive(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const productId = readText(formData, "productId");
+  const activeValue = readText(formData, "active");
+
+  if (!productId || (activeValue !== "true" && activeValue !== "false")) {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("update_admin_product_active", {
+    p_product_id: productId,
+    p_active: activeValue === "true",
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Məhsulun statusu dəyişdirilmədi."));
+  }
+
+  revalidateProductPaths(productId);
+
+  return ok(
+    activeValue === "true"
+      ? "Məhsul satışa çıxarıldı."
+      : "Məhsul satışdan çıxarıldı."
+  );
+}
+
+export async function updateProductContent(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const productId = readText(formData, "productId");
+  const name = readText(formData, "name");
+  const description = readText(formData, "description") ?? "";
+  const categoryId = readText(formData, "categoryId");
+
+  if (!productId || !categoryId) {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
+
+  if (!name) {
+    return fail("Məhsul adı mütləqdir.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("update_admin_product_content", {
+    p_product_id: productId,
+    p_name: name,
+    p_description: description,
+    p_category_id: categoryId,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Məhsul məlumatları yenilənmədi."));
+  }
+
+  revalidateProductPaths(productId);
+
+  return ok("Məhsul məlumatları yadda saxlandı.");
+}
+
+const allowedImageTypes: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+const maxImageSize = 5 * 1024 * 1024;
+
+export async function uploadProductImage(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const productId = readText(formData, "productId");
   const imageValue = formData.get("image");
 
-  if (
-    typeof productId !== "string" ||
-    !(imageValue instanceof File) ||
-    imageValue.size === 0
-  ) {
-    throw new Error("Geçersiz fotoğraf bilgisi.");
+  if (!productId) {
+    return fail("Məhsul məlumatı yanlışdır.");
   }
 
-  const allowedImageTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-  ];
-
-  if (!allowedImageTypes.includes(imageValue.type)) {
-    throw new Error(
-      "Sadece JPG, PNG veya WEBP fotoğraf yüklenebilir."
-    );
+  if (!(imageValue instanceof File) || imageValue.size === 0) {
+    return fail("Şəkil seçin.");
   }
 
-  const maxImageSize = 5 * 1024 * 1024;
+  const extension = allowedImageTypes[imageValue.type];
+
+  if (!extension) {
+    return fail("Yalnız JPG, PNG və ya WEBP şəkil yükləmək olar.");
+  }
 
   if (imageValue.size > maxImageSize) {
-    throw new Error("Fotoğraf en fazla 5 MB olabilir.");
+    return fail("Şəklin həcmi 5 MB-dan çox ola bilməz.");
   }
 
-  const supabase = await createClient();
+  const supabase = await getAuthedClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
-
-  const extensionByMimeType: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-  };
-
-  const extension = extensionByMimeType[imageValue.type];
-
-  const storagePath =
-    `${productId}/${crypto.randomUUID()}.${extension}`;
+  const storagePath = `${productId}/${crypto.randomUUID()}.${extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from("product-media")
@@ -285,7 +284,7 @@ export async function uploadProductImage(formData: FormData) {
     });
 
   if (uploadError) {
-    throw new Error("Fotoğraf Storage'a yüklenemedi.");
+    return fail("Şəkil yaddaşa yüklənmədi.");
   }
 
   const { error: mediaError } = await supabase.rpc(
@@ -300,133 +299,116 @@ export async function uploadProductImage(formData: FormData) {
   );
 
   if (mediaError) {
-    await supabase.storage
-      .from("product-media")
-      .remove([storagePath]);
+    await supabase.storage.from("product-media").remove([storagePath]);
 
-    throw new Error("Fotoğraf ürün kaydına bağlanamadı.");
+    return fail(dbErrorMessage(mediaError, "Şəkil məhsula bağlanmadı."));
   }
 
-  revalidatePath("/admin/products");
+  revalidateProductPaths(productId);
+
+  return ok("Şəkil yükləndi.");
 }
 
 export async function setProductPrimaryImage(
+  _state: ActionResult,
   formData: FormData
-) {
-  const mediaId = formData.get("mediaId");
+): Promise<ActionResult> {
+  const mediaId = readText(formData, "mediaId");
+  const productId = readText(formData, "productId") ?? undefined;
 
-  if (typeof mediaId !== "string" || !mediaId) {
-    throw new Error("Geçersiz fotoğraf bilgisi.");
+  if (!mediaId) {
+    return fail("Şəkil məlumatı yanlışdır.");
   }
 
-  const supabase = await createClient();
+  const supabase = await getAuthedClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
-
-  const { error } = await supabase.rpc(
-    "set_admin_product_primary_media",
-    {
-      p_media_id: mediaId,
-    }
-  );
+  const { error } = await supabase.rpc("set_admin_product_primary_media", {
+    p_media_id: mediaId,
+  });
 
   if (error) {
-    throw new Error("Ana fotoğraf değiştirilemedi.");
+    return fail(dbErrorMessage(error, "Əsas şəkil dəyişdirilmədi."));
   }
 
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
+  revalidateProductPaths(productId);
+
+  return ok("Əsas şəkil dəyişdirildi.");
+}
+
+async function deleteProductMedia(
+  formData: FormData,
+  labels: { invalid: string; failed: string; storage: string; done: string }
+): Promise<ActionResult> {
+  const mediaId = readText(formData, "mediaId");
+  const productId = readText(formData, "productId") ?? undefined;
+
+  if (!mediaId) {
+    return fail(labels.invalid);
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { data: storagePath, error: deleteError } = await supabase.rpc(
+    "delete_admin_product_media",
+    { p_media_id: mediaId }
+  );
+
+  if (deleteError || !storagePath) {
+    return fail(dbErrorMessage(deleteError, labels.failed));
+  }
+
+  const { error: storageError } = await supabase.storage
+    .from("product-media")
+    .remove([storagePath]);
+
+  revalidateProductPaths(productId);
+
+  if (storageError) {
+    return fail(labels.storage);
+  }
+
+  return ok(labels.done);
 }
 
 export async function deleteProductImage(
+  _state: ActionResult,
   formData: FormData
-) {
-  const mediaId = formData.get("mediaId");
+): Promise<ActionResult> {
+  return deleteProductMedia(formData, {
+    invalid: "Şəkil məlumatı yanlışdır.",
+    failed: "Şəkil silinmədi.",
+    storage: "Şəkil qeydi silindi, lakin fayl yaddaşdan təmizlənmədi.",
+    done: "Şəkil silindi.",
+  });
+}
 
-  if (typeof mediaId !== "string" || !mediaId) {
-    throw new Error("Geçersiz fotoğraf bilgisi.");
-  }
-
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
-
-  const { data: storagePath, error: deleteError } =
-    await supabase.rpc(
-      "delete_admin_product_media",
-      {
-        p_media_id: mediaId,
-      }
-    );
-
-  if (deleteError || !storagePath) {
-    throw new Error("Fotoğraf kaydı silinemedi.");
-  }
-
-  const { error: storageError } =
-    await supabase.storage
-      .from("product-media")
-      .remove([storagePath]);
-
-  if (storageError) {
-    throw new Error(
-      "Fotoğraf kaydı silindi ancak Storage temizlenemedi."
-    );
-  }
-
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
+export async function deleteProductVideo(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  return deleteProductMedia(formData, {
+    invalid: "Video məlumatı yanlışdır.",
+    failed: "Video silinmədi.",
+    storage: "Video qeydi silindi, lakin fayl yaddaşdan təmizlənmədi.",
+    done: "Video silindi.",
+  });
 }
 
 export async function registerProductVideo(formData: FormData) {
-  const productId = formData.get("productId");
-  const storagePath = formData.get("storagePath");
-  const originalName = formData.get("originalName");
-  const mimeType = formData.get("mimeType");
+  const productId = readText(formData, "productId");
+  const storagePath = readText(formData, "storagePath");
+  const originalName = readText(formData, "originalName") ?? "";
+  const mimeType = readText(formData, "mimeType");
 
-  if (
-    typeof productId !== "string" ||
-    !productId ||
-    typeof storagePath !== "string" ||
-    !storagePath ||
-    typeof originalName !== "string" ||
-    typeof mimeType !== "string"
-  ) {
-    throw new Error("Geçersiz video bilgisi.");
+  if (!productId || !storagePath || !mimeType) {
+    throw new Error("Invalid video data");
   }
 
-  const allowedVideoTypes = [
-    "video/mp4",
-    "video/webm",
-  ];
-
-  if (!allowedVideoTypes.includes(mimeType)) {
-    throw new Error(
-      "Sadece MP4 veya WEBM video yüklenebilir."
-    );
+  if (!["video/mp4", "video/webm"].includes(mimeType)) {
+    throw new Error("Invalid video type");
   }
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
+  const supabase = await getAuthedClient();
 
   const { error: mediaError } = await supabase.rpc(
     "create_admin_product_media",
@@ -440,61 +422,10 @@ export async function registerProductVideo(formData: FormData) {
   );
 
   if (mediaError) {
-    await supabase.storage
-      .from("product-media")
-      .remove([storagePath]);
+    await supabase.storage.from("product-media").remove([storagePath]);
 
-    throw new Error(
-      "Video ürün kaydına bağlanamadı."
-    );
+    throw new Error("Video registration failed");
   }
 
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
-}
-
-export async function deleteProductVideo(
-  formData: FormData
-) {
-  const mediaId = formData.get("mediaId");
-
-  if (typeof mediaId !== "string" || !mediaId) {
-    throw new Error("Geçersiz video bilgisi.");
-  }
-
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Oturum bulunamadı.");
-  }
-
-  const { data: storagePath, error: deleteError } =
-    await supabase.rpc(
-      "delete_admin_product_media",
-      {
-        p_media_id: mediaId,
-      }
-    );
-
-  if (deleteError || !storagePath) {
-    throw new Error("Video kaydı silinemedi.");
-  }
-
-  const { error: storageError } =
-    await supabase.storage
-      .from("product-media")
-      .remove([storagePath]);
-
-  if (storageError) {
-    throw new Error(
-      "Video kaydı silindi ancak Storage temizlenemedi."
-    );
-  }
-
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
+  revalidateProductPaths(productId);
 }

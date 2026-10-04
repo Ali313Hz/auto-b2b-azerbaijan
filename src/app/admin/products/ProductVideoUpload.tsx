@@ -4,11 +4,19 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
+
 import { registerProductVideo } from "./actions";
 
 type ProductVideoUploadProps = {
   productId: string;
 };
+
+const extensionByMimeType: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
+
+const maxVideoSize = 50 * 1024 * 1024;
 
 export default function ProductVideoUpload({
   productId,
@@ -16,71 +24,61 @@ export default function ProductVideoUpload({
   const router = useRouter();
 
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (uploading) {
+      return;
+    }
+
     const form = event.currentTarget;
-    const formData = new FormData(form);
-    const videoValue = formData.get("video");
+    const videoValue = new FormData(form).get("video");
 
-    if (
-      !(videoValue instanceof File) ||
-      videoValue.size === 0
-    ) {
-      setMessage("Lütfen bir video seçin.");
+    if (!(videoValue instanceof File) || videoValue.size === 0) {
+      setMessage({ ok: false, text: "Video seçin." });
       return;
     }
 
-    const allowedVideoTypes = [
-      "video/mp4",
-      "video/webm",
-    ];
+    const extension = extensionByMimeType[videoValue.type];
 
-    if (!allowedVideoTypes.includes(videoValue.type)) {
-      setMessage(
-        "Sadece MP4 veya WEBM video yüklenebilir."
-      );
+    if (!extension) {
+      setMessage({
+        ok: false,
+        text: "Yalnız MP4 və ya WEBM video yükləmək olar.",
+      });
       return;
     }
-
-    const maxVideoSize = 50 * 1024 * 1024;
 
     if (videoValue.size > maxVideoSize) {
-      setMessage("Video en fazla 50 MB olabilir.");
+      setMessage({
+        ok: false,
+        text: "Videonun həcmi 50 MB-dan çox ola bilməz.",
+      });
       return;
     }
 
     setUploading(true);
     setMessage(null);
 
-    const extensionByMimeType: Record<string, string> = {
-      "video/mp4": "mp4",
-      "video/webm": "webm",
-    };
-
-    const extension =
-      extensionByMimeType[videoValue.type];
-
-    const storagePath =
-      `${productId}/${crypto.randomUUID()}.${extension}`;
+    const storagePath = `${productId}/${crypto.randomUUID()}.${extension}`;
 
     const supabase = createClient();
 
-    const { error: uploadError } =
-      await supabase.storage
-        .from("product-media")
-        .upload(storagePath, videoValue, {
-          contentType: videoValue.type,
-          upsert: false,
-        });
+    const { error: uploadError } = await supabase.storage
+      .from("product-media")
+      .upload(storagePath, videoValue, {
+        contentType: videoValue.type,
+        upsert: false,
+      });
 
     if (uploadError) {
       setUploading(false);
-      setMessage("Video yüklenemedi.");
+      setMessage({ ok: false, text: "Video yaddaşa yüklənmədi." });
       return;
     }
 
@@ -88,70 +86,60 @@ export default function ProductVideoUpload({
       const registerFormData = new FormData();
 
       registerFormData.set("productId", productId);
-      registerFormData.set(
-        "storagePath",
-        storagePath
-      );
-      registerFormData.set(
-        "originalName",
-        videoValue.name
-      );
-      registerFormData.set(
-        "mimeType",
-        videoValue.type
-      );
+      registerFormData.set("storagePath", storagePath);
+      registerFormData.set("originalName", videoValue.name);
+      registerFormData.set("mimeType", videoValue.type);
 
       await registerProductVideo(registerFormData);
 
       form.reset();
-      setMessage("Video başarıyla yüklendi.");
+      setMessage({ ok: true, text: "Video yükləndi." });
       router.refresh();
     } catch {
-      setMessage(
-        "Video yüklendi ancak ürüne bağlanamadı."
-      );
+      setMessage({
+        ok: false,
+        text: "Video yükləndi, lakin məhsula bağlanmadı. Yenidən cəhd edin.",
+      });
     } finally {
       setUploading(false);
     }
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mt-5 space-y-3 rounded-lg border border-zinc-800 p-4"
-    >
-      <div>
-        <label className="block text-sm font-medium">
-          Ürün videosu
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
+      <div className="min-w-0 flex-1">
+        <label htmlFor={`video-${productId}`} className="label">
+          Yeni video
         </label>
 
         <input
+          id={`video-${productId}`}
           type="file"
           name="video"
           accept="video/mp4,video/webm"
           required
           disabled={uploading}
-          className="mt-2 block"
+          className="input file:mr-3 file:rounded file:border-0 file:bg-zinc-800 file:px-3 file:py-1 file:text-zinc-200"
         />
-
-        <p className="mt-2 text-sm text-zinc-400">
-          MP4 veya WEBM. En fazla 50 MB.
-        </p>
       </div>
 
       <button
         type="submit"
         disabled={uploading}
-        className="rounded-lg bg-white px-5 py-2 font-semibold text-black disabled:opacity-50"
+        aria-busy={uploading}
+        className="btn btn-primary"
       >
-        {uploading
-          ? "Video yükleniyor..."
-          : "Video Yükle"}
+        {uploading ? "Yüklənir..." : "Video yüklə"}
       </button>
 
       {message && (
-        <p className="text-sm text-zinc-300">
-          {message}
+        <p
+          role={message.ok ? "status" : "alert"}
+          className={`basis-full text-sm ${
+            message.ok ? "text-emerald-400" : "text-red-400"
+          }`}
+        >
+          {message.text}
         </p>
       )}
     </form>
