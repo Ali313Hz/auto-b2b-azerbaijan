@@ -1,6 +1,14 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+
+const adminLinks = [
+  { href: "/admin/orders", label: "Siparişler" },
+  { href: "/admin/products", label: "Ürünler" },
+  { href: "/admin/categories", label: "Kategoriler" },
+  { href: "/admin/customers", label: "Müşteriler" },
+] as const;
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -40,9 +48,17 @@ export default async function AdminPage() {
 
       <div className="mt-8 rounded-xl border border-zinc-800 p-5">
         <h2 className="text-lg font-semibold">Yönetim</h2>
-        <p className="mt-2 text-zinc-400">
-          Müşteri, ürün ve stok yönetimi buraya eklenecek.
-        </p>
+        <nav className="mt-4 grid gap-3 sm:grid-cols-2">
+          {adminLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-lg border border-zinc-800 px-4 py-3 font-medium hover:bg-zinc-900"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
       </div>
     </main>
   );
