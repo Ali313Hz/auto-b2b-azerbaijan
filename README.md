@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dostlar Auto — B2B
 
-## Getting Started
+B2B ordering platform for car accessories in Azerbaijan (prices in AZN).
+Built with Next.js (App Router), TypeScript, Supabase (Postgres, Auth,
+Storage) and deployed on Vercel.
 
-First, run the development server:
+## Features
+
+- **Customers:** catalog with category filter and search, product gallery and
+  videos, price for the customer's own price group (NORMAL / DEALER / VIP),
+  cart, order placement, order history.
+- **Owner (admin):** dashboard, orders (confirm / cancel with stock return),
+  products (content, SKU, category, stock, three prices, active state,
+  images with primary image, videos), categories, customers (create, edit,
+  price group, active, archive, safe permanent delete).
+
+## Security model
+
+- All reads and writes of business data go through `SECURITY DEFINER` RPCs
+  with `search_path = ''`, `EXECUTE` revoked from `anon`/`public`.
+- Admin RPCs check for an active `OWNER` staff profile in the database.
+- Prices are selected in the database from the customer's stored price group;
+  the client never sends a price or a group. Order totals are computed in
+  `create_order_from_cart`.
+- Tables have RLS enabled and no direct grants except `SELECT` on the caller's
+  own profile row.
+- The Supabase secret key is only used server-side (`src/lib/supabase/admin.ts`,
+  `server-only`) for customer login account management, after an OWNER check.
+
+## Local development
 
 ```bash
+cp .env.example .env.local   # fill in real values
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database migrations
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Migrations live in `supabase/migrations`. Never edit an applied migration;
+add a new one instead.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npx supabase link --project-ref <project-ref>
+npx supabase migration list --linked
+npx supabase db push --linked
+npx supabase gen types typescript --linked --schema public > src/types/database.types.ts
+```
 
-## Learn More
+## Deploying to Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Import the GitHub repository in Vercel (framework: Next.js, default build
+   command `next build`).
+2. Set environment variables for Production (and Preview if used):
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `SUPABASE_SECRET_KEY` (mark it as sensitive).
+3. In Supabase → Authentication → URL Configuration set the Site URL to the
+   Vercel production URL.
+4. Apply pending migrations with `npx supabase db push --linked` before or
+   together with the deploy.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Checks
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
