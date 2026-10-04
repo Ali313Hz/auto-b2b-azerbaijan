@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #e4e4e7;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,15 +13,66 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-zinc-800 bg-zinc-900/60;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-amber-500 text-zinc-950 hover:bg-amber-400;
+  }
+
+  .btn-secondary {
+    @apply border border-zinc-700 bg-zinc-900 text-zinc-100 hover:border-zinc-500 hover:bg-zinc-800;
+  }
+
+  .btn-danger {
+    @apply border border-red-800/70 bg-red-950/30 text-red-300 hover:bg-red-950/70;
+  }
+
+  .btn-success {
+    @apply border border-emerald-700/70 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/80;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .label {
+    @apply mb-1 block text-sm font-medium text-zinc-300;
+  }
+
+  .input {
+    @apply block w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto rounded-xl border border-zinc-800;
+  }
+
+  .table {
+    @apply w-full min-w-[640px] text-left text-sm;
+  }
+
+  .table th {
+    @apply border-b border-zinc-800 bg-zinc-900 px-4 py-3 text-xs font-medium tracking-wide text-zinc-400 uppercase;
+  }
+
+  .table td {
+    @apply border-b border-zinc-800/70 px-4 py-3 align-middle;
+  }
+
+  .table tr:last-child td {
+    @apply border-b-0;
+  }
 }
