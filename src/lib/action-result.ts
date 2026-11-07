@@ -33,6 +33,17 @@ const dbMessages: Record<string, string> = {
   "Customer not found": "Müştəri tapılmadı.",
   "Product name is required": "Məhsul adı tələb olunur.",
   "Only images can be primary": "Yalnız şəkil əsas ola bilər.",
+  "MFA required": "İki mərhələli təsdiq tələb olunur. Yenidən daxil olun.",
+  "Category hierarchy cannot contain a cycle":
+    "Kateqoriyanı öz alt kateqoriyasının altına köçürmək olmaz.",
+  "Category cannot be its own parent":
+    "Kateqoriya özünün ana kateqoriyası ola bilməz.",
+  "Category hierarchy too deep":
+    "Kateqoriya ağacı ən çox 3 səviyyəli ola bilər.",
+  "Parent category not found": "Ana kateqoriya tapılmadı.",
+  "Category name is required": "Kateqoriya adı mütləqdir (maks. 100 simvol).",
+  "Category slug is required":
+    "Slug yalnız kiçik latın hərfləri, rəqəmlər və tire ola bilər.",
 };
 
 export function dbErrorMessage(

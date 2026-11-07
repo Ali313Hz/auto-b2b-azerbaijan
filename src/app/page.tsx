@@ -7,21 +7,25 @@ import { getSession } from "@/lib/auth";
 import { logout } from "./(shop)/account/actions";
 
 export default async function Home() {
-  const { user, staff, customer } = await getSession();
+  const { user, mfaVerified, staff, customer } = await getSession();
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (!mfaVerified) {
+    redirect("/mfa");
   }
 
   if (staff?.active && staff.role === "OWNER") {
     redirect("/admin");
   }
 
-  if (customer?.active) {
+  if (customer?.active && !customer.archived_at) {
     redirect("/products");
   }
 
-  if (customer && !customer.active) {
+  if (customer) {
     redirect("/login?error=inactive");
   }
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import SubmitButton from "@/components/SubmitButton";
 import { Badge, PageHeader } from "@/components/ui";
@@ -59,11 +60,17 @@ export default async function AccountPage() {
           əlaqə saxlayın.
         </p>
 
-        <form action={logout} className="mt-6">
-          <SubmitButton className="btn btn-secondary" pendingText="Çıxılır...">
-            Hesabdan çıx
-          </SubmitButton>
-        </form>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/security" className="btn btn-secondary">
+            İki mərhələli təsdiq
+          </Link>
+
+          <form action={logout}>
+            <SubmitButton className="btn btn-secondary" pendingText="Çıxılır...">
+              Hesabdan çıx
+            </SubmitButton>
+          </form>
+        </div>
       </div>
     </>
   );

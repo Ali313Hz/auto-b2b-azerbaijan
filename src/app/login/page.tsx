@@ -1,17 +1,13 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import SubmitButton from "@/components/SubmitButton";
 import { Logo } from "@/components/ui";
+import { getSession } from "@/lib/auth";
 
-import { login } from "./actions";
+import LoginForm from "./LoginForm";
 
 export const metadata: Metadata = {
   title: "Daxil ol",
-};
-
-const errorMessages: Record<string, string> = {
-  inactive: "Hesabınız deaktiv edilib. Administratorla əlaqə saxlayın.",
-  invalid: "E-poçt və ya şifrə yanlışdır.",
 };
 
 export default async function LoginPage({
@@ -20,6 +16,14 @@ export default async function LoginPage({
   const params = await searchParams;
   const errorCode =
     typeof params.error === "string" ? params.error : undefined;
+
+  if (!errorCode) {
+    const { user } = await getSession();
+
+    if (user) {
+      redirect("/");
+    }
+  }
 
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
@@ -37,57 +41,15 @@ export default async function LoginPage({
             Avtomobil aksesuarları üzrə topdan sifariş platforması
           </p>
 
-          {errorCode && (
-            <p
-              role="alert"
-              className="mt-5 rounded-lg border border-red-800/60 bg-red-950/40 p-3 text-sm text-red-200"
-            >
-              {errorMessages[errorCode] ?? errorMessages.invalid}
-            </p>
-          )}
-
-          <form action={login} className="mt-6 space-y-4">
-            <div>
-              <label htmlFor="email" className="label">
-                E-poçt
-              </label>
-
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                className="input"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="label">
-                Şifrə
-              </label>
-
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                className="input"
-              />
-            </div>
-
-            <SubmitButton
-              className="btn btn-primary w-full py-2.5"
-              pendingText="Yoxlanılır..."
-            >
-              Daxil ol
-            </SubmitButton>
-          </form>
+          <LoginForm
+            errorCode={errorCode}
+            turnstileSiteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined}
+          />
         </div>
 
         <p className="mt-6 text-center text-xs text-zinc-600">
-          Hesab yalnız administrator tərəfindən yaradılır.
+          Hesab yalnız administrator tərəfindən yaradılır. Girişdən sonra
+          autentifikator tətbiqindən 6 rəqəmli kod tələb olunur.
         </p>
       </div>
     </main>

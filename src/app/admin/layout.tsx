@@ -39,6 +39,8 @@ export default async function AdminLayout({
             <NavLink href="/admin/products">Məhsullar</NavLink>
             <NavLink href="/admin/categories">Kateqoriyalar</NavLink>
             <NavLink href="/admin/customers">Müştərilər</NavLink>
+            <NavLink href="/admin/audit">Audit</NavLink>
+            <NavLink href="/security">2FA</NavLink>
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
