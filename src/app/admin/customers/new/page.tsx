@@ -51,13 +51,14 @@ export default async function NewCustomerPage() {
             <input id="email" type="email" name="email" required autoComplete="off" className="input" />
           </Field>
 
-          <Field label="Müvəqqəti şifrə *" htmlFor="password" hint="Ən azı 8 simvol.">
+          <Field label="Müvəqqəti şifrə *" htmlFor="password" hint="Ən azı 12 simvol: böyük və kiçik hərf, rəqəm və simvol.">
             <input
               id="password"
               type="password"
               name="password"
               required
-              minLength={8}
+              minLength={12}
+              maxLength={72}
               autoComplete="new-password"
               className="input"
             />

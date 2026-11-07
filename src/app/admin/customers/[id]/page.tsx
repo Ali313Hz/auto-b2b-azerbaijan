@@ -24,6 +24,7 @@ import {
   updateCustomerLogin,
   updateCustomerPriceGroup,
   updateCustomerProfile,
+  resetCustomerMfa,
 } from "../actions";
 
 export const metadata: Metadata = {
@@ -230,12 +231,13 @@ export default async function AdminCustomerDetailPage({
                   />
                 </Field>
 
-                <Field label="Yeni şifrə" htmlFor="newPassword" hint="Ən azı 8 simvol.">
+                <Field label="Yeni şifrə" htmlFor="newPassword" hint="Ən azı 12 simvol: böyük və kiçik hərf, rəqəm və simvol.">
                   <input
                     id="newPassword"
                     type="password"
                     name="password"
-                    minLength={8}
+                    minLength={12}
+                    maxLength={72}
                     autoComplete="new-password"
                     className="input"
                   />
@@ -246,6 +248,28 @@ export default async function AdminCustomerDetailPage({
                     Giriş məlumatlarını yenilə
                   </SubmitButton>
                 </div>
+              </ActionForm>
+            </section>
+          )}
+
+          {!isArchived && (
+            <section className="card p-5 sm:p-6">
+              <h2 className="font-semibold text-white">İki mərhələli təsdiq (2FA)</h2>
+              <p className="mt-1 mb-4 text-sm text-zinc-400">
+                Müştəri autentifikator cihazını itiribsə, kimliyini başqa
+                kanalla (telefon zəngi, şəxsən) yoxladıqdan sonra sıfırlayın.
+                Növbəti girişdə müştəri yeni cihaz qoşmalı olacaq. Əməliyyat
+                audit jurnalına yazılır.
+              </p>
+
+              <ActionForm
+                action={resetCustomerMfa}
+                confirmMessage="Müştərinin bütün autentifikator cihazları silinsin? Müştəri növbəti girişdə yenisini qoşmalı olacaq."
+              >
+                <input type="hidden" name="customerId" value={customer.id} />
+                <SubmitButton className="btn btn-danger" pendingText="Sıfırlanır...">
+                  2FA-nı sıfırla
+                </SubmitButton>
               </ActionForm>
             </section>
           )}

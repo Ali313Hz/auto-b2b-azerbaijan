@@ -21,6 +21,25 @@ function isPriceGroup(value: unknown): value is PriceGroup {
   return allowedPriceGroups.includes(value as PriceGroup);
 }
 
+// Same rule as the Supabase Auth password policy: 12+ characters with
+// lower- and upper-case letters, a digit and a symbol (bcrypt max 72 bytes).
+function passwordProblem(password: string) {
+  if (password.length < 12 || new TextEncoder().encode(password).length > 72) {
+    return "Şifrə 12–72 simvol olmalıdır.";
+  }
+
+  if (
+    !/[a-z]/.test(password) ||
+    !/[A-Z]/.test(password) ||
+    !/[0-9]/.test(password) ||
+    !/[^A-Za-z0-9]/.test(password)
+  ) {
+    return "Şifrədə böyük və kiçik hərf, rəqəm və simvol olmalıdır.";
+  }
+
+  return null;
+}
+
 function readText(formData: FormData, key: string) {
   const value = formData.get(key);
 
@@ -41,24 +60,43 @@ async function getAuthedClient() {
   return { supabase, user };
 }
 
-// Service-role operations bypass RLS, so OWNER access is checked here
-// explicitly before the admin client is created.
+// Service-role operations bypass RLS, so the database confirms the caller
+// is an active OWNER with an MFA (aal2) session before the secret key is
+// used. Any error or doubt means no access.
 async function getOwnerClient() {
-  const { supabase, user } = await getAuthedClient();
+  const { supabase } = await getAuthedClient();
 
-  const { data: staff } = await supabase
-    .from("staff_profiles")
-    .select("role, active")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data: isOwner, error } = await supabase.rpc("current_user_is_owner");
 
-  if (!staff || !staff.active || staff.role !== "OWNER") {
+  if (error || isOwner !== true) {
     return null;
   }
 
   const { createAdminClient } = await import("@/lib/supabase/admin");
 
   return { supabase, admin: createAdminClient() };
+}
+
+type SecurityEvent =
+  | "customer.login_created"
+  | "customer.email_changed"
+  | "customer.password_changed"
+  | "customer.mfa_reset"
+  | "customer.deleted";
+
+async function recordEvent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  action: SecurityEvent,
+  targetId: string
+) {
+  const { error } = await supabase.rpc("record_admin_security_event", {
+    p_action: action,
+    p_target_id: targetId,
+  });
+
+  if (error) {
+    console.error("Audit event not recorded", action);
+  }
 }
 
 function revalidateCustomerPaths(customerId?: string) {
@@ -142,8 +180,10 @@ export async function createCustomer(
     return fail("Düzgün e-poçt ünvanı daxil edin.");
   }
 
-  if (password.length < 8) {
-    return fail("Şifrə ən azı 8 simvol olmalıdır.");
+  const weakPassword = passwordProblem(password);
+
+  if (weakPassword) {
+    return fail(weakPassword);
   }
 
   if (!companyName || !contactName) {
@@ -192,6 +232,8 @@ export async function createCustomer(
     return fail("Müştəri profili yaradılmadı.");
   }
 
+  await recordEvent(owner.supabase, "customer.login_created", createdUser.user.id);
+
   revalidateCustomerPaths();
 
   redirect(`/admin/customers/${createdUser.user.id}?notice=created`);
@@ -203,7 +245,7 @@ export async function updateCustomerLogin(
 ): Promise<ActionResult> {
   const customerId = readText(formData, "customerId");
   const email = readText(formData, "email").toLowerCase();
-  const password = String(formData.get("password") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
 
   if (!customerId) {
     return fail("Müştəri məlumatı yanlışdır.");
@@ -217,8 +259,10 @@ export async function updateCustomerLogin(
     return fail("Düzgün e-poçt ünvanı daxil edin.");
   }
 
-  if (password && password.length < 8) {
-    return fail("Yeni şifrə ən azı 8 simvol olmalıdır.");
+  const weakPassword = password ? passwordProblem(password) : null;
+
+  if (weakPassword) {
+    return fail(weakPassword);
   }
 
   const owner = await getOwnerClient();
@@ -272,6 +316,9 @@ export async function updateCustomerLogin(
     );
   }
 
+  if (email) await recordEvent(owner.supabase, "customer.email_changed", customerId);
+  if (password) await recordEvent(owner.supabase, "customer.password_changed", customerId);
+
   revalidateCustomerPaths(customerId);
 
   return ok("Giriş məlumatları yeniləndi.");
@@ -322,9 +369,14 @@ export async function archiveCustomer(
     return fail("Müştəri məlumatı yanlışdır.");
   }
 
-  const { supabase } = await getAuthedClient();
+  const owner = await getOwnerClient();
 
-  const { error } = await supabase.rpc("archive_admin_customer", {
+  if (!owner) {
+    return fail("Bu əməliyyat üçün icazəniz yoxdur.");
+  }
+
+  // The RPC raises "Customer not found" for anything but a customer.
+  const { error } = await owner.supabase.rpc("archive_admin_customer", {
     p_customer_id: customerId,
   });
 
@@ -332,7 +384,17 @@ export async function archiveCustomer(
     return fail(dbErrorMessage(error, "Müştəri arxivləşdirilmədi."));
   }
 
+  // Archived customers cannot sign in at all (not only lose data access).
+  const { error: banError } = await owner.admin.auth.admin.updateUserById(
+    customerId,
+    { ban_duration: "876000h" }
+  );
+
   revalidateCustomerPaths(customerId);
+
+  if (banError) {
+    return fail("Müştəri arxivləşdirildi, lakin giriş bloklanmadı. Yenidən cəhd edin.");
+  }
 
   return ok("Müştəri arxivləşdirildi.");
 }
@@ -347,15 +409,24 @@ export async function restoreCustomer(
     return fail("Müştəri məlumatı yanlışdır.");
   }
 
-  const { supabase } = await getAuthedClient();
+  const owner = await getOwnerClient();
 
-  const { error } = await supabase.rpc("restore_admin_customer", {
+  if (!owner) {
+    return fail("Bu əməliyyat üçün icazəniz yoxdur.");
+  }
+
+  const { error } = await owner.supabase.rpc("restore_admin_customer", {
     p_customer_id: customerId,
   });
 
   if (error) {
     return fail(dbErrorMessage(error, "Müştəri arxivdən çıxarılmadı."));
   }
+
+  // Restored customers stay inactive until the OWNER activates them.
+  await owner.admin.auth.admin.updateUserById(customerId, {
+    ban_duration: "none",
+  });
 
   revalidateCustomerPaths(customerId);
 
@@ -402,7 +473,68 @@ export async function permanentlyDeleteCustomer(
     return fail("Müştəri silinmədi.");
   }
 
+  await recordEvent(owner.supabase, "customer.deleted", customerId);
+
   revalidateCustomerPaths();
 
   redirect("/admin/customers?notice=deleted");
+}
+
+// Lost-authenticator recovery for customers. Only an aal2 OWNER can do it,
+// only for customer accounts, and every reset is written to the audit log.
+// The customer still needs their password and must enroll a new device.
+export async function resetCustomerMfa(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const customerId = readText(formData, "customerId");
+
+  if (!customerId) {
+    return fail("Müştəri məlumatı yanlışdır.");
+  }
+
+  const owner = await getOwnerClient();
+
+  if (!owner) {
+    return fail("Bu əməliyyat üçün icazəniz yoxdur.");
+  }
+
+  const { data: customerStatus, error: customerError } =
+    await owner.supabase.rpc("get_admin_customer_delete_status", {
+      p_customer_id: customerId,
+    });
+
+  const profile = customerStatus?.[0];
+
+  if (customerError || !profile) {
+    return fail("Müştəri tapılmadı.");
+  }
+
+  if (profile.archived) {
+    return fail("Arxivdəki müştərinin 2FA-sı sıfırlana bilməz.");
+  }
+
+  const { data: factors, error: listError } =
+    await owner.admin.auth.admin.mfa.listFactors({ userId: customerId });
+
+  if (listError) {
+    return fail("2FA sıfırlanmadı.");
+  }
+
+  for (const factor of factors?.factors ?? []) {
+    const { error } = await owner.admin.auth.admin.mfa.deleteFactor({
+      id: factor.id,
+      userId: customerId,
+    });
+
+    if (error) {
+      return fail("2FA tam sıfırlanmadı. Yenidən cəhd edin.");
+    }
+  }
+
+  await recordEvent(owner.supabase, "customer.mfa_reset", customerId);
+
+  revalidateCustomerPaths(customerId);
+
+  return ok("2FA sıfırlandı. Müştəri növbəti girişdə yeni cihaz qoşacaq.");
 }
