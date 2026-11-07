@@ -9,6 +9,8 @@ import {
   fail,
   ok,
 } from "@/lib/action-result";
+import { uuidPattern } from "@/lib/format";
+import { thumbnailPathFor } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 
 async function getAuthedClient() {
@@ -246,6 +248,7 @@ const allowedImageTypes: Record<string, string> = {
 };
 
 const maxImageSize = 5 * 1024 * 1024;
+const maxThumbnailSize = 512 * 1024;
 
 export async function uploadProductImage(
   _state: ActionResult,
@@ -273,6 +276,10 @@ export async function uploadProductImage(
   }
 
   const supabase = await getAuthedClient();
+
+  if (!uuidPattern.test(productId)) {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
 
   const storagePath = `${productId}/${crypto.randomUUID()}.${extension}`;
 
@@ -302,6 +309,23 @@ export async function uploadProductImage(
     await supabase.storage.from("product-media").remove([storagePath]);
 
     return fail(dbErrorMessage(mediaError, "Şəkil məhsula bağlanmadı."));
+  }
+
+  // Optional small copy for catalog cards; the original is used otherwise.
+  const thumbnail = formData.get("thumbnail");
+
+  if (
+    thumbnail instanceof File &&
+    thumbnail.size > 0 &&
+    thumbnail.size <= maxThumbnailSize &&
+    thumbnail.type === "image/webp"
+  ) {
+    await supabase.storage
+      .from("product-media")
+      .upload(thumbnailPathFor(storagePath) as string, thumbnail, {
+        contentType: "image/webp",
+        upsert: false,
+      });
   }
 
   revalidateProductPaths(productId);
@@ -359,7 +383,9 @@ async function deleteProductMedia(
 
   const { error: storageError } = await supabase.storage
     .from("product-media")
-    .remove([storagePath]);
+    .remove([storagePath, thumbnailPathFor(storagePath)].filter(
+      (path): path is string => Boolean(path)
+    ));
 
   revalidateProductPaths(productId);
 

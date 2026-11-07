@@ -6,6 +6,7 @@ import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, Field, PageHeader } from "@/components/ui";
 import { requireOwner } from "@/lib/auth";
+import { uuidPattern } from "@/lib/format";
 import { signMediaPaths } from "@/lib/media";
 
 import {
@@ -17,6 +18,7 @@ import {
   updateProductContent,
   uploadProductImage,
 } from "../actions";
+import ImageFileInput from "../ImageFileInput";
 import PriceFields from "../PriceFields";
 import ProductVideoUpload from "../ProductVideoUpload";
 
@@ -37,16 +39,21 @@ export default async function AdminProductDetailPage({
   searchParams,
 }: PageProps<"/admin/products/[id]">) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
+
+  if (!uuidPattern.test(id)) {
+    notFound();
+  }
+
   const { supabase } = await requireOwner();
 
   const [{ data: products }, { data: categories }, { data: media }] =
     await Promise.all([
-      supabase.rpc("get_admin_products"),
+      supabase.rpc("get_admin_product", { p_product_id: id }),
       supabase.rpc("get_admin_categories"),
       supabase.rpc("get_admin_product_media", { p_product_id: id }),
     ]);
 
-  const product = products?.find((item) => item.id === id);
+  const product = products?.[0];
 
   if (!product) {
     notFound();
@@ -141,8 +148,8 @@ export default async function AdminProductDetailPage({
                 </option>
                 {(categories ?? []).map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.name}
-                    {category.active ? "" : " (deaktiv)"}
+                    {category.path}
+                    {category.available ? "" : " (deaktiv)"}
                   </option>
                 ))}
               </select>
@@ -271,19 +278,7 @@ export default async function AdminProductDetailPage({
         >
           <input type="hidden" name="productId" value={product.id} />
 
-          <div className="min-w-0 flex-1">
-            <label htmlFor="image" className="label">
-              Yeni şəkil
-            </label>
-            <input
-              id="image"
-              type="file"
-              name="image"
-              accept="image/jpeg,image/png,image/webp"
-              required
-              className="input file:mr-3 file:rounded file:border-0 file:bg-zinc-800 file:px-3 file:py-1 file:text-zinc-200"
-            />
-          </div>
+          <ImageFileInput />
 
           <SubmitButton pendingText="Yüklənir...">Şəkil yüklə</SubmitButton>
         </ActionForm>

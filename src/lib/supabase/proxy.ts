@@ -1,9 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function updateSession(request: NextRequest) {
+// requestHeaders carries the CSP nonce through to rendering.
+export async function updateSession(
+  request: NextRequest,
+  requestHeaders: Headers
+) {
   let supabaseResponse = NextResponse.next({
-    request,
+    request: { headers: requestHeaders },
   });
 
   const supabase = createServerClient(
@@ -19,8 +23,11 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value);
           });
 
+          // Forward the refreshed cookies to the render as well.
+          requestHeaders.set("cookie", request.cookies.toString());
+
           supabaseResponse = NextResponse.next({
-            request,
+            request: { headers: requestHeaders },
           });
 
           cookiesToSet.forEach(({ name, value, options }) => {
