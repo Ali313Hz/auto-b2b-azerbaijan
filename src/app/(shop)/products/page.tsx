@@ -1,31 +1,48 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
+import Pagination, { pageHref } from "@/components/Pagination";
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
-import { formatAzn } from "@/lib/format";
-import { signMediaPaths } from "@/lib/media";
+import { formatAzn, readPage } from "@/lib/format";
+import { signCardImages } from "@/lib/media";
 
 import AddToCartForm from "./AddToCartForm";
+import CatalogSearch from "./CatalogSearch";
 
 export const metadata: Metadata = {
   title: "Kataloq",
 };
+
+const PAGE_SIZE = 24;
+const SORTS = ["name", "price_asc", "price_desc", "newest", "sku"];
 
 export default async function ProductsPage({
   searchParams,
 }: PageProps<"/products">) {
   const params = await searchParams;
   const selectedCategory =
-    typeof params.category === "string" ? params.category : "";
-  const query = typeof params.q === "string" ? params.q.trim() : "";
-  const normalizedQuery = query.toLocaleLowerCase("az");
+    typeof params.category === "string" ? params.category.slice(0, 80) : "";
+  const query = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
+  const sort =
+    typeof params.sort === "string" && SORTS.includes(params.sort) ? params.sort : "name";
+  const page = readPage(params.page);
 
   const { supabase } = await requireCustomer();
 
-  const { data: products, error } = await supabase.rpc(
-    "get_customer_catalog"
-  );
+  // One page per request. Price, filtering, search and paging all happen in
+  // the database; the response only contains this customer's own price.
+  const [{ data: products, error }, { data: categories }] = await Promise.all([
+    supabase.rpc("get_customer_catalog_page", {
+      p_page: page,
+      p_page_size: PAGE_SIZE,
+      p_category_slug: selectedCategory || null,
+      p_search: query || null,
+      p_sort: sort,
+    }),
+    supabase.rpc("get_customer_categories"),
+  ]);
 
   if (error) {
     return (
@@ -38,50 +55,35 @@ export default async function ProductsPage({
     );
   }
 
-  const allProducts = [...(products ?? [])].sort((a, b) =>
-    a.name.localeCompare(b.name, "az")
-  );
+  const visibleProducts = products ?? [];
+  const total = visibleProducts[0]?.total_count ?? 0;
+  const allCategories = categories ?? [];
+  const hasFilters = Boolean(selectedCategory || query);
 
-  const categories = [
-    ...new Map(
-      allProducts
-        .filter((product) => product.category_slug)
-        .map((product) => [
-          product.category_slug as string,
-          product.category_name ?? (product.category_slug as string),
-        ])
-    ),
-  ].sort((a, b) => a[1].localeCompare(b[1], "az"));
+  // Category navigation: main categories, then the children of the selected
+  // branch (selected category, its parent or its grandparent).
+  const bySlug = new Map(allCategories.map((category) => [category.slug, category]));
+  const byId = new Map(allCategories.map((category) => [category.id, category]));
+  const selected = bySlug.get(selectedCategory);
+  const trail: typeof allCategories = [];
 
-  const visibleProducts = allProducts.filter((product) => {
-    if (selectedCategory && product.category_slug !== selectedCategory) {
-      return false;
-    }
+  for (let node = selected; node; node = node.parent_id ? byId.get(node.parent_id) : undefined) {
+    trail.unshift(node);
+  }
 
-    if (!normalizedQuery) {
-      return true;
-    }
+  const levels = [
+    allCategories.filter((category) => !category.parent_id),
+    ...trail.map((node) => allCategories.filter((category) => category.parent_id === node.id)),
+  ].filter((level) => level.length > 0);
 
-    return [product.name, product.sku, product.description ?? ""].some(
-      (value) => value.toLocaleLowerCase("az").includes(normalizedQuery)
-    );
-  });
+  const linkParams = { q: query, sort: sort === "name" ? undefined : sort };
+  const categoryHref = (slug: string) =>
+    pageHref("/products", { ...linkParams, category: slug || undefined }, 1);
 
-  const imageUrls = await signMediaPaths(
+  const imageUrls = await signCardImages(
     supabase,
     visibleProducts.map((product) => product.primary_image_path)
   );
-
-  const categoryHref = (slug: string) => {
-    const search = new URLSearchParams();
-
-    if (slug) search.set("category", slug);
-    if (query) search.set("q", query);
-
-    const value = search.toString();
-
-    return value ? `/products?${value}` : "/products";
-  };
 
   return (
     <>
@@ -90,71 +92,60 @@ export default async function ProductsPage({
         description="Qiymətlər sizin qiymət qrupunuza uyğun göstərilir."
       />
 
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <nav
-          aria-label="Kateqoriyalar"
-          className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1"
-        >
-          <Link
-            href={categoryHref("")}
-            className={`btn btn-sm ${
-              selectedCategory ? "btn-secondary" : "btn-primary"
-            }`}
-          >
-            Hamısı
-          </Link>
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <nav aria-label="Kateqoriyalar" className="min-w-0 space-y-2">
+            {levels.map((level, index) => (
+              <div key={index} className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1">
+                {index === 0 && (
+                  <Link
+                    href={categoryHref("")}
+                    className={`btn btn-sm ${selectedCategory ? "btn-secondary" : "btn-primary"}`}
+                  >
+                    Hamısı
+                  </Link>
+                )}
 
-          {categories.map(([slug, name]) => (
-            <Link
-              key={slug}
-              href={categoryHref(slug)}
-              className={`btn btn-sm ${
-                selectedCategory === slug ? "btn-primary" : "btn-secondary"
-              }`}
-            >
-              {name}
-            </Link>
-          ))}
-        </nav>
+                {level.map((category) => {
+                  const active = trail.some((node) => node.id === category.id);
 
-        <form action="/products" className="flex w-full gap-2 lg:w-96">
-          {selectedCategory && (
-            <input type="hidden" name="category" value={selectedCategory} />
-          )}
+                  return (
+                    <Link
+                      key={category.id}
+                      href={categoryHref(category.slug)}
+                      className={`btn btn-sm whitespace-nowrap ${active ? "btn-primary" : "btn-secondary"}`}
+                    >
+                      {category.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
 
-          <label htmlFor="catalog-search" className="sr-only">
-            Məhsul axtar
-          </label>
+          <Suspense fallback={<div className="h-10 w-full lg:w-[30rem]" />}>
+            <CatalogSearch />
+          </Suspense>
+        </div>
 
-          <input
-            id="catalog-search"
-            type="search"
-            name="q"
-            defaultValue={query}
-            placeholder="Ad və ya SKU ilə axtar"
-            className="input"
-          />
-
-          <button type="submit" className="btn btn-secondary">
-            Axtar
-          </button>
-        </form>
+        {hasFilters && (
+          <p className="text-sm text-zinc-400">
+            {total} məhsul tapıldı
+            {selected ? ` · ${trail.map((node) => node.name).join(" / ")}` : ""}
+          </p>
+        )}
       </div>
 
       {visibleProducts.length === 0 ? (
         <EmptyState
-          title={
-            allProducts.length === 0
-              ? "Hazırda satışda məhsul yoxdur"
-              : "Uyğun məhsul tapılmadı"
-          }
+          title={hasFilters ? "Uyğun məhsul tapılmadı" : "Hazırda satışda məhsul yoxdur"}
           description={
-            allProducts.length === 0
-              ? "Yeni məhsullar əlavə edildikdə burada görünəcək."
-              : "Başqa kateqoriya seçin və ya axtarış sözünü dəyişin."
+            hasFilters
+              ? "Başqa kateqoriya seçin və ya axtarış sözünü dəyişin."
+              : "Yeni məhsullar əlavə edildikdə burada görünəcək."
           }
           action={
-            allProducts.length > 0 ? (
+            hasFilters ? (
               <Link href="/products" className="btn btn-secondary">
                 Filtrləri sıfırla
               </Link>
@@ -163,7 +154,7 @@ export default async function ProductsPage({
         />
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {visibleProducts.map((product) => {
+          {visibleProducts.map((product, index) => {
             const imageUrl = product.primary_image_path
               ? imageUrls.get(product.primary_image_path)
               : undefined;
@@ -182,7 +173,10 @@ export default async function ProductsPage({
                     <img
                       src={imageUrl}
                       alt={product.name}
-                      loading="lazy"
+                      width={400}
+                      height={300}
+                      // First row is above the fold; the rest load lazily.
+                      loading={index < 4 ? "eager" : "lazy"}
                       decoding="async"
                       className="h-full w-full object-contain p-2 transition-transform group-hover:scale-[1.02]"
                     />
@@ -233,6 +227,14 @@ export default async function ProductsPage({
           })}
         </ul>
       )}
+
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        basePath="/products"
+        params={{ ...linkParams, category: selectedCategory || undefined }}
+      />
     </>
   );
 }

@@ -116,6 +116,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          parent_id: string | null
           slug: string
           sort_order: number
           updated_at: string
@@ -125,6 +126,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          parent_id?: string | null
           slug: string
           sort_order?: number
           updated_at?: string
@@ -134,6 +136,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          parent_id?: string | null
           slug?: string
           sort_order?: number
           updated_at?: string
@@ -441,6 +444,121 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_is_owner: { Args: never; Returns: boolean }
+      get_admin_audit_log: {
+        Args: { p_page?: number; p_page_size?: number }
+        Returns: {
+          action: string
+          actor_name: string | null
+          actor_user_id: string | null
+          created_at: string
+          details: Json | null
+          id: number
+          target_id: string | null
+          target_type: string
+          total_count: number
+        }[]
+      }
+      get_admin_dashboard_stats: {
+        Args: never
+        Returns: {
+          active_customers: number
+          active_products: number
+          low_stock_products: number
+          pending_orders: number
+          total_products: number
+        }[]
+      }
+      get_admin_product: {
+        Args: { p_product_id: string }
+        Returns: {
+          active: boolean
+          category_id: string | null
+          category_name: string | null
+          dealer_price: number | null
+          description: string | null
+          id: string
+          name: string
+          normal_price: number | null
+          sku: string
+          stock: number
+          vip_price: number | null
+        }[]
+      }
+      get_admin_products_page: {
+        Args: {
+          p_category_id?: string | null
+          p_low_stock?: boolean
+          p_page?: number
+          p_page_size?: number
+          p_search?: string | null
+          p_sort?: string
+          p_status?: string | null
+        }
+        Returns: {
+          active: boolean
+          category_id: string | null
+          category_name: string | null
+          dealer_price: number | null
+          id: string
+          name: string
+          normal_price: number | null
+          sku: string
+          stock: number
+          total_count: number
+          vip_price: number | null
+        }[]
+      }
+      get_customer_catalog_page: {
+        Args: {
+          p_category_slug?: string | null
+          p_include_subcategories?: boolean
+          p_page?: number
+          p_page_size?: number
+          p_search?: string | null
+          p_sort?: string
+        }
+        Returns: {
+          category_id: string | null
+          category_name: string | null
+          category_slug: string | null
+          id: string
+          name: string
+          price: number
+          primary_image_path: string | null
+          sku: string
+          stock: number
+          total_count: number
+        }[]
+      }
+      get_customer_categories: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+          parent_id: string | null
+          slug: string
+          sort_order: number
+        }[]
+      }
+      get_customer_product: {
+        Args: { p_product_id: string }
+        Returns: {
+          category_id: string | null
+          category_name: string | null
+          category_slug: string | null
+          description: string | null
+          id: string
+          name: string
+          price: number
+          sku: string
+          stock: number
+        }[]
+      }
+      record_admin_security_event: {
+        Args: { p_action: string; p_target_id: string }
+        Returns: undefined
+      }
       add_to_cart: {
         Args: { p_product_id: string; p_quantity: number }
         Returns: number
@@ -457,6 +575,7 @@ export type Database = {
         Args: {
           p_active: boolean
           p_name: string
+          p_parent_id: string | null
           p_slug: string
           p_sort_order: number
         }
@@ -493,8 +612,13 @@ export type Database = {
         Args: never
         Returns: {
           active: boolean
+          available: boolean
+          depth: number
           id: string
           name: string
+          parent_id: string | null
+          path: string
+          product_count: number
           slug: string
           sort_order: number
         }[]
@@ -564,22 +688,6 @@ export type Database = {
           storage_path: string
         }[]
       }
-      get_admin_products: {
-        Args: never
-        Returns: {
-          active: boolean
-          category_id: string
-          category_name: string
-          dealer_price: number
-          description: string
-          id: string
-          name: string
-          normal_price: number
-          sku: string
-          stock: number
-          vip_price: number
-        }[]
-      }
       get_customer_cart: {
         Args: never
         Returns: {
@@ -591,21 +699,6 @@ export type Database = {
           sku: string
           stock: number
           unit_price: number
-        }[]
-      }
-      get_customer_catalog: {
-        Args: never
-        Returns: {
-          category_id: string
-          category_name: string
-          category_slug: string
-          description: string
-          id: string
-          name: string
-          price: number
-          primary_image_path: string
-          sku: string
-          stock: number
         }[]
       }
       get_customer_order_items: {
@@ -664,6 +757,7 @@ export type Database = {
           p_active: boolean
           p_category_id: string
           p_name: string
+          p_parent_id: string | null
           p_slug: string
           p_sort_order: number
         }

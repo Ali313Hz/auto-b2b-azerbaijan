@@ -9,6 +9,7 @@ import {
   fail,
   ok,
 } from "@/lib/action-result";
+import { uuidPattern } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 const transliteration: Record<string, string> = {
@@ -37,6 +38,7 @@ function parseCategory(formData: FormData) {
   const rawSlug = String(formData.get("slug") ?? "").trim();
   const sortOrder = Number(formData.get("sortOrder") ?? 0);
   const activeValue = formData.get("active");
+  const parentValue = String(formData.get("parentId") ?? "");
 
   if (!name) {
     return { valid: false, error: "Kateqoriya adı mütləqdir." } as const;
@@ -59,9 +61,19 @@ function parseCategory(formData: FormData) {
     return { valid: false, error: "Status yanlışdır." } as const;
   }
 
+  if (parentValue && !uuidPattern.test(parentValue)) {
+    return { valid: false, error: "Ana kateqoriya yanlışdır." } as const;
+  }
+
   return {
     valid: true,
-    value: { name, slug, sortOrder, active: activeValue === "true" },
+    value: {
+      name,
+      slug,
+      sortOrder,
+      active: activeValue === "true",
+      parentId: parentValue || null,
+    },
   } as const;
 }
 
@@ -103,6 +115,7 @@ export async function createCategory(
     p_slug: parsed.value.slug,
     p_sort_order: parsed.value.sortOrder,
     p_active: parsed.value.active,
+    p_parent_id: parsed.value.parentId,
   });
 
   if (error) {
@@ -137,6 +150,7 @@ export async function updateCategory(
     p_slug: parsed.value.slug,
     p_sort_order: parsed.value.sortOrder,
     p_active: parsed.value.active,
+    p_parent_id: parsed.value.parentId,
   });
 
   if (error) {

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
-import { formatAzn } from "@/lib/format";
+import { formatAzn, uuidPattern } from "@/lib/format";
 import { signMediaPaths } from "@/lib/media";
 
 import AddToCartForm from "../AddToCartForm";
@@ -13,9 +13,6 @@ import ProductImageGallery from "../ProductImageGallery";
 export const metadata: Metadata = {
   title: "Məhsul",
 };
-
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function ProductDetailPage({
   params,
@@ -28,12 +25,14 @@ export default async function ProductDetailPage({
 
   const { supabase } = await requireCustomer();
 
+  // One product (with this customer's price) and its gallery/videos; the
+  // gallery is only loaded on the detail page, never in the catalog.
   const [{ data: products }, { data: media }] = await Promise.all([
-    supabase.rpc("get_customer_catalog"),
+    supabase.rpc("get_customer_product", { p_product_id: id }),
     supabase.rpc("get_customer_product_media", { p_product_id: id }),
   ]);
 
-  const product = products?.find((item) => item.id === id);
+  const product = products?.[0];
 
   if (!product) {
     notFound();

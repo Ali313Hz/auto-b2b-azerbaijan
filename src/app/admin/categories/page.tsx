@@ -11,13 +11,12 @@ export const metadata: Metadata = {
   title: "Kateqoriyalar",
 };
 
+const indentClasses = ["", "border-l-4 border-l-zinc-700 sm:ml-6", "border-l-4 border-l-zinc-700 sm:ml-12"];
+
 export default async function AdminCategoriesPage() {
   const { supabase } = await requireOwner();
 
-  const [{ data: categories, error }, { data: products }] = await Promise.all([
-    supabase.rpc("get_admin_categories"),
-    supabase.rpc("get_admin_products"),
-  ]);
+  const { data: categories, error } = await supabase.rpc("get_admin_categories");
 
   if (error) {
     return (
@@ -28,22 +27,43 @@ export default async function AdminCategoriesPage() {
     );
   }
 
-  const productCounts = new Map<string, number>();
+  const allCategories = categories ?? [];
 
-  for (const product of products ?? []) {
-    if (product.category_id) {
-      productCounts.set(
-        product.category_id,
-        (productCounts.get(product.category_id) ?? 0) + 1
-      );
+  // Children by parent, used to hide a category's own subtree from its
+  // "move to" options (the database rejects such moves as well).
+  const childrenOf = new Map<string, string[]>();
+
+  for (const category of allCategories) {
+    if (category.parent_id) {
+      childrenOf.set(category.parent_id, [
+        ...(childrenOf.get(category.parent_id) ?? []),
+        category.id,
+      ]);
     }
   }
+
+  const subtreeOf = (id: string): Set<string> => {
+    const result = new Set([id]);
+    const queue = [id];
+
+    while (queue.length > 0) {
+      for (const child of childrenOf.get(queue.shift() as string) ?? []) {
+        result.add(child);
+        queue.push(child);
+      }
+    }
+
+    return result;
+  };
+
+  // A new child must stay within 3 levels.
+  const parentOptions = allCategories.filter((category) => category.depth < 3);
 
   return (
     <>
       <PageHeader
         title="Kateqoriyalar"
-        description="Deaktiv kateqoriyanın məhsulları müştərilərə göstərilmir. Kateqoriyalar sifariş tarixçəsini qorumaq üçün silinmir."
+        description="Ana kateqoriya → alt kateqoriya → alt-alt kateqoriya (maks. 3 səviyyə). Deaktiv kateqoriyanın və onun bütün alt kateqoriyalarının məhsulları müştərilərə göstərilmir. Kateqoriyalar silinmir."
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr] lg:items-start">
@@ -61,6 +81,17 @@ export default async function AdminCategoriesPage() {
               hint="Boş qalsa addan avtomatik yaradılır (məs. led-lampalar)."
             >
               <input id="new-slug" name="slug" maxLength={80} className="input font-mono" />
+            </Field>
+
+            <Field label="Ana kateqoriya" htmlFor="new-parent">
+              <select id="new-parent" name="parentId" defaultValue="" className="input">
+                <option value="">— Əsas kateqoriya —</option>
+                {parentOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.path}
+                  </option>
+                ))}
+              </select>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
@@ -92,28 +123,40 @@ export default async function AdminCategoriesPage() {
         </section>
 
         <section>
-          {!categories || categories.length === 0 ? (
+          {allCategories.length === 0 ? (
             <EmptyState
               title="Hələ kateqoriya yoxdur"
               description="Soldakı formadan ilk kateqoriyanı yaradın."
             />
           ) : (
             <ul className="space-y-3">
-              {categories.map((category) => (
-                <li key={category.id} className="card p-4">
+              {allCategories.map((category) => {
+                const blocked = subtreeOf(category.id);
+
+                return (
+                <li
+                  key={category.id}
+                  className={`card p-4 ${indentClasses[category.depth - 1] ?? ""}`}
+                >
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-white">{category.name}</span>
+                    {category.depth > 1 && (
+                      <span className="text-xs text-zinc-500">{category.path}</span>
+                    )}
                     {category.active ? (
                       <Badge tone="green">Aktiv</Badge>
                     ) : (
                       <Badge tone="red">Deaktiv</Badge>
                     )}
-                    <Badge>{productCounts.get(category.id) ?? 0} məhsul</Badge>
+                    {category.active && !category.available && (
+                      <Badge tone="amber">Ana kateqoriya deaktivdir</Badge>
+                    )}
+                    <Badge>{category.product_count} məhsul</Badge>
                   </div>
 
                   <ActionForm
                     action={updateCategory}
-                    className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_90px_130px_auto] lg:items-end"
+                    className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_80px_120px_auto] lg:items-end"
                   >
                     <input type="hidden" name="categoryId" value={category.id} />
 
@@ -137,6 +180,25 @@ export default async function AdminCategoriesPage() {
                         defaultValue={category.slug}
                         className="input font-mono"
                       />
+                    </Field>
+
+                    <Field label="Ana kateqoriya" htmlFor={`parent-${category.id}`}>
+                      <select
+                        key={category.parent_id ?? "root"}
+                        id={`parent-${category.id}`}
+                        name="parentId"
+                        defaultValue={category.parent_id ?? ""}
+                        className="input"
+                      >
+                        <option value="">— Əsas —</option>
+                        {parentOptions
+                          .filter((option) => !blocked.has(option.id))
+                          .map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.path}
+                            </option>
+                          ))}
+                      </select>
                     </Field>
 
                     <Field label="Sıra" htmlFor={`sort-${category.id}`}>
@@ -170,7 +232,8 @@ export default async function AdminCategoriesPage() {
                     <SubmitButton pendingText="...">Yadda saxla</SubmitButton>
                   </ActionForm>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </section>

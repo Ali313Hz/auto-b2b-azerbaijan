@@ -15,26 +15,26 @@ const LOW_STOCK_THRESHOLD = 5;
 export default async function AdminPage() {
   const { supabase } = await requireOwner();
 
-  const [ordersResult, productsResult, customersResult] = await Promise.all([
+  // Counts come from one aggregate RPC; only the rows shown are fetched.
+  const [ordersResult, statsResult, lowStockResult] = await Promise.all([
     supabase.rpc("get_admin_orders"),
-    supabase.rpc("get_admin_products"),
-    supabase.rpc("get_admin_customers"),
+    supabase.rpc("get_admin_dashboard_stats"),
+    supabase.rpc("get_admin_products_page", {
+      p_page: 1,
+      p_page_size: 6,
+      p_low_stock: true,
+      p_sort: "stock",
+    }),
   ]);
 
   const orders = ordersResult.data ?? [];
-  const products = productsResult.data ?? [];
-  const customers = customersResult.data ?? [];
+  const counts = statsResult.data?.[0];
+  const lowStock = lowStockResult.data ?? [];
   const hasError =
-    ordersResult.error || productsResult.error || customersResult.error;
+    ordersResult.error || statsResult.error || lowStockResult.error;
 
   const pendingOrders = orders.filter((order) => order.status === "PENDING");
-  const activeProducts = products.filter((product) => product.active);
-  const lowStock = activeProducts
-    .filter((product) => product.stock <= LOW_STOCK_THRESHOLD)
-    .sort((a, b) => a.stock - b.stock);
-  const activeCustomers = customers.filter(
-    (customer) => customer.active && !customer.archived_at
-  );
+  const lowStockCount = counts?.low_stock_products ?? 0;
 
   const stats = [
     {
@@ -45,18 +45,18 @@ export default async function AdminPage() {
     },
     {
       label: "Aktiv məhsullar",
-      value: `${activeProducts.length} / ${products.length}`,
+      value: `${counts?.active_products ?? 0} / ${counts?.total_products ?? 0}`,
       href: "/admin/products",
     },
     {
       label: "Az stoklu məhsullar",
-      value: lowStock.length,
+      value: lowStockCount,
       href: "/admin/products?stock=low",
-      highlight: lowStock.length > 0,
+      highlight: lowStockCount > 0,
     },
     {
       label: "Aktiv müştərilər",
-      value: activeCustomers.length,
+      value: counts?.active_customers ?? 0,
       href: "/admin/customers",
     },
   ];
@@ -155,7 +155,7 @@ export default async function AdminPage() {
             <EmptyState title="Bütün aktiv məhsullar kifayət qədər stokdadır" />
           ) : (
             <ul className="card divide-y divide-zinc-800">
-              {lowStock.slice(0, 6).map((product) => (
+              {lowStock.map((product) => (
                 <li key={product.id}>
                   <Link
                     href={`/admin/products/${product.id}`}

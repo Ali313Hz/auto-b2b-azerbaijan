@@ -54,3 +54,13 @@ export const priceGroupLabels: Record<PriceGroup, string> = {
 export const priceGroups = ["NORMAL", "DEALER", "VIP"] as const;
 
 export type BadgeTone = "neutral" | "green" | "amber" | "red" | "blue";
+
+// Reads a positive page number from a search param (invalid -> 1).
+export function readPage(value: string | string[] | undefined) {
+  const page = Number(typeof value === "string" ? value : 1);
+
+  return Number.isInteger(page) && page > 0 && page <= 10000 ? page : 1;
+}
+
+export const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

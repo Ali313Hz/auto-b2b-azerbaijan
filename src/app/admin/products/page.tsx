@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import Pagination from "@/components/Pagination";
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
 import { requireOwner } from "@/lib/auth";
-import { formatAzn } from "@/lib/format";
+import { formatAzn, readPage, uuidPattern } from "@/lib/format";
+
+const PAGE_SIZE = 50;
 
 export const metadata: Metadata = {
   title: "Məhsullar",
@@ -13,19 +16,33 @@ export default async function AdminProductsPage({
   searchParams,
 }: PageProps<"/admin/products">) {
   const params = await searchParams;
-  const query = typeof params.q === "string" ? params.q.trim() : "";
-  const normalizedQuery = query.toLocaleLowerCase("az");
+  const query = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
   const categoryFilter =
-    typeof params.category === "string" ? params.category : "";
+    typeof params.category === "string" && uuidPattern.test(params.category)
+      ? params.category
+      : "";
   const statusFilter =
-    typeof params.status === "string" ? params.status : "";
+    params.status === "active" || params.status === "inactive"
+      ? params.status
+      : "";
   const lowStockOnly = params.stock === "low";
+  const page = readPage(params.page);
 
   const { supabase } = await requireOwner();
 
-  const [{ data: products, error }, { data: categories }] = await Promise.all(
-    [supabase.rpc("get_admin_products"), supabase.rpc("get_admin_categories")]
-  );
+  // One page per request; filtering, search and counting run in the database.
+  const [{ data: products, error }, { data: categories }] = await Promise.all([
+    supabase.rpc("get_admin_products_page", {
+      p_page: page,
+      p_page_size: PAGE_SIZE,
+      p_search: query || null,
+      p_category_id: categoryFilter || null,
+      p_status: statusFilter || null,
+      p_low_stock: lowStockOnly,
+      p_sort: lowStockOnly ? "stock" : "newest",
+    }),
+    supabase.rpc("get_admin_categories"),
+  ]);
 
   if (error) {
     return (
@@ -36,25 +53,8 @@ export default async function AdminProductsPage({
     );
   }
 
-  const allProducts = products ?? [];
-
-  const visibleProducts = allProducts.filter((product) => {
-    if (categoryFilter && product.category_id !== categoryFilter) {
-      return false;
-    }
-
-    if (statusFilter === "active" && !product.active) return false;
-    if (statusFilter === "inactive" && product.active) return false;
-    if (lowStockOnly && product.stock > 5) return false;
-
-    if (!normalizedQuery) {
-      return true;
-    }
-
-    return [product.name, product.sku].some((value) =>
-      value.toLocaleLowerCase("az").includes(normalizedQuery)
-    );
-  });
+  const visibleProducts = products ?? [];
+  const total = visibleProducts[0]?.total_count ?? 0;
 
   const hasFilters = Boolean(
     query || categoryFilter || statusFilter || lowStockOnly
@@ -64,7 +64,7 @@ export default async function AdminProductsPage({
     <>
       <PageHeader
         title="Məhsullar"
-        description={`${allProducts.length} məhsul`}
+        description={hasFilters ? `${total} uyğun məhsul` : `${total} məhsul`}
         actions={
           <Link href="/admin/products/new" className="btn btn-primary">
             + Yeni məhsul
@@ -86,6 +86,7 @@ export default async function AdminProductsPage({
             name="q"
             defaultValue={query}
             placeholder="Ad və ya SKU"
+            maxLength={100}
             className="input"
           />
         </div>
@@ -103,7 +104,7 @@ export default async function AdminProductsPage({
             <option value="">Hamısı</option>
             {(categories ?? []).map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.path}
               </option>
             ))}
           </select>
@@ -229,6 +230,19 @@ export default async function AdminProductsPage({
           </table>
         </div>
       )}
+
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        basePath="/admin/products"
+        params={{
+          q: query,
+          category: categoryFilter,
+          status: statusFilter,
+          stock: lowStockOnly ? "low" : undefined,
+        }}
+      />
     </>
   );
 }

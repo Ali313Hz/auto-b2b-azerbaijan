@@ -70,8 +70,8 @@ export default async function NewProductPage() {
                 </option>
                 {(categories ?? []).map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.name}
-                    {category.active ? "" : " (deaktiv)"}
+                    {category.path}
+                    {category.available ? "" : " (deaktiv)"}
                   </option>
                 ))}
               </select>
