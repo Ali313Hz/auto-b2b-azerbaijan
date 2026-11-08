@@ -3,17 +3,24 @@ import type { Database } from "@/types/database.types";
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PriceGroup = Database["public"]["Enums"]["customer_price_group"];
 
-const aznFormatter = new Intl.NumberFormat("az-AZ", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
+// Azerbaijani money format "1.234,50 ₼", built by hand: browsers without
+// az-AZ locale data would format differently from the server and break
+// hydration of client components.
 export function formatAzn(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") {
     return "—";
   }
 
-  return `${aznFormatter.format(Number(value))} ₼`;
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "—";
+  }
+
+  const [whole, cents] = Math.abs(number).toFixed(2).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  return `${number < 0 && Number(whole + cents) !== 0 ? "-" : ""}${grouped},${cents} ₼`;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("az-AZ", {
