@@ -150,9 +150,13 @@ export type Database = {
           company_name: string | null
           contact_name: string | null
           created_at: string
+          credentials_changed_at: string | null
+          credentials_session_id: string | null
           id: string
+          must_change_password: boolean
           phone: string | null
           price_group: Database["public"]["Enums"]["customer_price_group"]
+          temporary_password_expires_at: string | null
           updated_at: string
         }
         Insert: {
@@ -161,9 +165,13 @@ export type Database = {
           company_name?: string | null
           contact_name?: string | null
           created_at?: string
+          credentials_changed_at?: string | null
+          credentials_session_id?: string | null
           id: string
+          must_change_password?: boolean
           phone?: string | null
           price_group?: Database["public"]["Enums"]["customer_price_group"]
+          temporary_password_expires_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -172,9 +180,13 @@ export type Database = {
           company_name?: string | null
           contact_name?: string | null
           created_at?: string
+          credentials_changed_at?: string | null
+          credentials_session_id?: string | null
           id?: string
+          must_change_password?: boolean
           phone?: string | null
           price_group?: Database["public"]["Enums"]["customer_price_group"]
+          temporary_password_expires_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -416,25 +428,37 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          credentials_changed_at: string | null
+          credentials_session_id: string | null
           full_name: string | null
           id: string
+          must_change_password: boolean
           role: Database["public"]["Enums"]["staff_role"]
+          temporary_password_expires_at: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           created_at?: string
+          credentials_changed_at?: string | null
+          credentials_session_id?: string | null
           full_name?: string | null
           id: string
+          must_change_password?: boolean
           role: Database["public"]["Enums"]["staff_role"]
+          temporary_password_expires_at?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
           created_at?: string
+          credentials_changed_at?: string | null
+          credentials_session_id?: string | null
           full_name?: string | null
           id?: string
+          must_change_password?: boolean
           role?: Database["public"]["Enums"]["staff_role"]
+          temporary_password_expires_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -445,6 +469,67 @@ export type Database = {
     }
     Functions: {
       current_user_is_owner: { Args: never; Returns: boolean }
+      complete_password_change: {
+        Args: { p_session_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      create_admin_staff_profile: {
+        Args: {
+          p_full_name: string
+          p_role: Database["public"]["Enums"]["staff_role"]
+          p_user_id: string
+        }
+        Returns: string
+      }
+      get_admin_customer_login: {
+        Args: { p_customer_id: string }
+        Returns: {
+          active: boolean
+          archived_at: string | null
+          credentials_changed_at: string | null
+          email: string | null
+          last_sign_in_at: string | null
+          must_change_password: boolean
+          temporary_password_expires_at: string | null
+        }[]
+      }
+      get_admin_staff: {
+        Args: never
+        Returns: {
+          active: boolean
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          last_sign_in_at: string | null
+          must_change_password: boolean
+          role: Database["public"]["Enums"]["staff_role"]
+          temporary_password_expires_at: string | null
+        }[]
+      }
+      get_my_account_state: {
+        Args: never
+        Returns: {
+          account_type: "customer" | "staff"
+          active: boolean
+          must_change_password: boolean
+          session_current: boolean
+          temporary_password_expired: boolean
+        }[]
+      }
+      mark_admin_password_reset: {
+        Args: { p_account_type: "customer" | "staff"; p_user_id: string }
+        Returns: string
+      }
+      update_admin_staff: {
+        Args: {
+          p_active: boolean
+          p_full_name: string
+          p_role: Database["public"]["Enums"]["staff_role"]
+          p_staff_id: string
+        }
+        Returns: undefined
+      }
       get_admin_audit_log: {
         Args: { p_page?: number; p_page_size?: number }
         Returns: {
