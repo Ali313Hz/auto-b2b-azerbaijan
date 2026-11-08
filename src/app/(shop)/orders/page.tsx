@@ -18,7 +18,11 @@ export const metadata: Metadata = {
 export default async function OrdersPage() {
   const { supabase } = await requireCustomer();
 
-  const { data: orders, error } = await supabase.rpc("get_customer_orders");
+  const [{ data: orders, error }, { data: alerts }] = await Promise.all([
+    supabase.rpc("get_customer_orders"),
+    supabase.rpc("get_customer_order_alerts"),
+  ]);
+  const changed = new Set((alerts ?? []).map((alert) => alert.order_id));
 
   if (error) {
     return (
@@ -53,48 +57,36 @@ export default async function OrdersPage() {
         description={`Cəmi ${orders.length} sifariş`}
       />
 
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Sifariş</th>
-              <th>Tarix</th>
-              <th>Status</th>
-              <th className="text-right">Məbləğ</th>
-              <th className="sr-only">Ətraflı</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {orders.map((order) => (
-              <tr key={order.order_id} className="hover:bg-zinc-900/60">
-                <td className="font-mono font-medium text-white">
+      <ul className="space-y-3">
+        {orders.map((order) => (
+          <li key={order.order_id}>
+            <Link
+              href={`/orders/${order.order_id}`}
+              className={`card flex flex-wrap items-center justify-between gap-3 p-4 hover:border-zinc-600 ${
+                changed.has(order.order_id) ? "border-amber-500/70" : ""
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="font-mono font-medium text-white">
                   #{shortId(order.order_id)}
-                </td>
-                <td className="text-zinc-400">
-                  {formatDate(order.created_at)}
-                </td>
-                <td>
-                  <Badge tone={orderStatusTones[order.status]}>
-                    {orderStatusLabels[order.status]}
-                  </Badge>
-                </td>
-                <td className="text-right font-semibold text-white">
+                </p>
+                <p className="text-sm text-zinc-400">{formatDate(order.created_at)}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {changed.has(order.order_id) && (
+                  <Badge tone="amber">Dəyişiklik var · cavabınızı gözləyir</Badge>
+                )}
+                <Badge tone={orderStatusTones[order.status]}>
+                  {orderStatusLabels[order.status]}
+                </Badge>
+                <span className="font-semibold whitespace-nowrap text-white">
                   {formatAzn(order.total_amount)}
-                </td>
-                <td className="text-right">
-                  <Link
-                    href={`/orders/${order.order_id}`}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    Ətraflı
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </span>
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
