@@ -348,27 +348,30 @@ export type Database = {
       product_prices: {
         Row: {
           created_at: string
-          dealer_price: number
+          dealer_price: number | null
           normal_price: number
           product_id: string
+          sale_price: number | null
           updated_at: string
-          vip_price: number
+          vip_price: number | null
         }
         Insert: {
           created_at?: string
-          dealer_price: number
+          dealer_price?: number | null
           normal_price: number
           product_id: string
+          sale_price?: number | null
           updated_at?: string
-          vip_price: number
+          vip_price?: number | null
         }
         Update: {
           created_at?: string
-          dealer_price?: number
+          dealer_price?: number | null
           normal_price?: number
           product_id?: string
+          sale_price?: number | null
           updated_at?: string
-          vip_price?: number
+          vip_price?: number | null
         }
         Relationships: [
           {
@@ -674,6 +677,7 @@ export type Database = {
           id: string
           name: string
           normal_price: number | null
+          sale_price: number | null
           sku: string
           stock: number
           vip_price: number | null
@@ -693,20 +697,22 @@ export type Database = {
           active: boolean
           category_id: string | null
           category_name: string | null
-          dealer_price: number | null
+          has_group_prices: boolean | null
           id: string
           name: string
           normal_price: number | null
+          primary_image_path: string | null
+          sale_price: number | null
           sku: string
           stock: number
           total_count: number
-          vip_price: number | null
         }[]
       }
       get_customer_catalog_page: {
         Args: {
           p_category_slug?: string | null
           p_include_subcategories?: boolean
+          p_on_sale?: boolean
           p_page?: number
           p_page_size?: number
           p_search?: string | null
@@ -718,8 +724,10 @@ export type Database = {
           category_slug: string | null
           id: string
           name: string
+          on_sale: boolean
           price: number
           primary_image_path: string | null
+          regular_price: number
           sku: string
           stock: number
           total_count: number
@@ -744,7 +752,9 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          on_sale: boolean
           price: number
+          regular_price: number
           sku: string
           stock: number
         }[]
@@ -775,17 +785,90 @@ export type Database = {
         }
         Returns: string
       }
-      create_admin_product: {
+      create_admin_product:
+        | {
+            Args: {
+              p_active: boolean
+              p_category_id: string
+              p_dealer_price: number
+              p_normal_price: number
+              p_sku: string
+              p_stock: number
+              p_vip_price: number
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_active: boolean
+              p_category_id: string
+              p_dealer_price: number | null
+              p_normal_price: number
+              p_sale_price: number | null
+              p_sku: string
+              p_stock: number
+              p_vip_price: number | null
+            }
+            Returns: string
+          }
+      update_admin_product_pricing: {
         Args: {
-          p_active: boolean
-          p_category_id: string
-          p_dealer_price: number
+          p_dealer_price: number | null
           p_normal_price: number
-          p_sku: string
+          p_product_id: string
+          p_sale_price: number | null
           p_stock: number
-          p_vip_price: number
+          p_vip_price: number | null
         }
-        Returns: string
+        Returns: undefined
+      }
+      update_admin_order_items: {
+        Args: {
+          p_expected_updated_at?: string | null
+          p_items: Json
+          p_order_id: string
+        }
+        Returns: number
+      }
+      get_admin_order_changes: {
+        Args: { p_order_id: string }
+        Returns: {
+          actor_name: string | null
+          after: Json | null
+          before: Json | null
+          change_id: string
+          change_type: string
+          created_at: string
+          id: string
+          product_id: string | null
+          product_name: string | null
+          sku: string | null
+        }[]
+      }
+      get_customer_order_changes: {
+        Args: { p_order_id: string }
+        Returns: {
+          change_id: string
+          change_type: string
+          created_at: string
+          price_after: number | null
+          price_before: number | null
+          product_name: string | null
+          quantity_after: number | null
+          quantity_before: number | null
+          sku: string | null
+        }[]
+      }
+      get_customer_order_lines: {
+        Args: { p_order_id: string }
+        Returns: {
+          line_total: number
+          product_id: string
+          product_name: string
+          quantity: number
+          sku: string
+          unit_price: number
+        }[]
       }
       create_admin_product_media: {
         Args: {
@@ -890,6 +973,7 @@ export type Database = {
           name: string
           product_id: string
           quantity: number
+          regular_price: number
           sku: string
           stock: number
           unit_price: number

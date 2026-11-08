@@ -109,14 +109,28 @@ export async function createCategory(
   }
 
   const supabase = await getAuthedClient();
+  const autoSlug = !String(formData.get("slug") ?? "").trim();
 
-  const { error } = await supabase.rpc("create_admin_category", {
-    p_name: parsed.value.name,
-    p_slug: parsed.value.slug,
-    p_sort_order: parsed.value.sortOrder,
-    p_active: parsed.value.active,
-    p_parent_id: parsed.value.parentId,
-  });
+  // The slug comes from the name. The same name can exist under different
+  // parents (e.g. "Universal"), so a taken auto slug gets -2, -3, ...
+  let error = null;
+
+  for (let attempt = 1; attempt <= 20; attempt++) {
+    const suffix = attempt === 1 ? "" : `-${attempt}`;
+    const slug = `${parsed.value.slug.slice(0, 80 - suffix.length)}${suffix}`;
+
+    ({ error } = await supabase.rpc("create_admin_category", {
+      p_name: parsed.value.name,
+      p_slug: slug,
+      p_sort_order: parsed.value.sortOrder,
+      p_active: parsed.value.active,
+      p_parent_id: parsed.value.parentId,
+    }));
+
+    if (!error || !autoSlug || error.message !== "Category slug already exists") {
+      break;
+    }
+  }
 
   if (error) {
     return fail(dbErrorMessage(error, "Kateqoriya yaradılmadı."));

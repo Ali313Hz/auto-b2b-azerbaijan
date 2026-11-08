@@ -5,7 +5,6 @@ import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Field, PageHeader } from "@/components/ui";
 import { requireOwner } from "@/lib/auth";
-import { priceGroupLabels, priceGroups } from "@/lib/format";
 
 import { createCustomer } from "../actions";
 
@@ -62,16 +61,6 @@ export default async function NewCustomerPage() {
               autoComplete="new-password"
               className="input"
             />
-          </Field>
-
-          <Field label="Qiymət qrupu" htmlFor="priceGroup">
-            <select id="priceGroup" name="priceGroup" defaultValue="NORMAL" className="input">
-              {priceGroups.map((group) => (
-                <option key={group} value={group}>
-                  {priceGroupLabels[group]}
-                </option>
-              ))}
-            </select>
           </Field>
 
           <Field label="Status" htmlFor="active">

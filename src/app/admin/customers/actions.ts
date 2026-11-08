@@ -16,15 +16,7 @@ import {
 } from "@/lib/owner";
 import { passwordProblem } from "@/lib/password";
 
-const allowedPriceGroups = ["NORMAL", "DEALER", "VIP"] as const;
-
-type PriceGroup = (typeof allowedPriceGroups)[number];
-
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function isPriceGroup(value: unknown): value is PriceGroup {
-  return allowedPriceGroups.includes(value as PriceGroup);
-}
 
 function readText(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -39,33 +31,6 @@ function revalidateCustomerPaths(customerId?: string) {
   if (customerId) {
     revalidatePath(`/admin/customers/${customerId}`);
   }
-}
-
-export async function updateCustomerPriceGroup(
-  _state: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
-  const customerId = readText(formData, "customerId");
-  const priceGroup = readText(formData, "priceGroup");
-
-  if (!customerId || !isPriceGroup(priceGroup)) {
-    return fail("Müştəri və ya qiymət qrupu yanlışdır.");
-  }
-
-  const { supabase } = await getAuthedClient();
-
-  const { error } = await supabase.rpc("set_customer_price_group", {
-    target_customer_id: customerId,
-    new_price_group: priceGroup,
-  });
-
-  if (error) {
-    return fail(dbErrorMessage(error, "Qiymət qrupu dəyişdirilmədi."));
-  }
-
-  revalidateCustomerPaths(customerId);
-
-  return ok("Qiymət qrupu yadda saxlandı.");
 }
 
 export async function updateCustomerActive(
@@ -112,7 +77,6 @@ export async function createCustomer(
   const companyName = readText(formData, "companyName");
   const contactName = readText(formData, "contactName");
   const phone = readText(formData, "phone");
-  const priceGroup = readText(formData, "priceGroup");
   const activeValue = readText(formData, "active");
 
   if (!emailPattern.test(email)) {
@@ -129,8 +93,8 @@ export async function createCustomer(
     return fail("Şirkət adı və əlaqə şəxsi mütləqdir.");
   }
 
-  if (!isPriceGroup(priceGroup) || (activeValue !== "true" && activeValue !== "false")) {
-    return fail("Qiymət qrupu və ya status yanlışdır.");
+  if (activeValue !== "true" && activeValue !== "false") {
+    return fail("Status yanlışdır.");
   }
 
   const owner = await getOwnerClient();
@@ -161,7 +125,9 @@ export async function createCustomer(
       company_name: companyName,
       contact_name: contactName,
       phone: phone || null,
-      price_group: priceGroup,
+      // Only NORMAL customers for now; dealer / VIP stay in the database
+      // for later but are not chosen in the panel.
+      price_group: "NORMAL",
       active: activeValue === "true",
       // The OWNER chose this password, so the customer replaces it at the
       // first login (within 24 hours, like a reset).

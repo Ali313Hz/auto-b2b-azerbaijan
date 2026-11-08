@@ -1,7 +1,6 @@
 import type { Database } from "@/types/database.types";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
-type RevisionStatus = Database["public"]["Enums"]["order_revision_status"];
 type PriceGroup = Database["public"]["Enums"]["customer_price_group"];
 
 const aznFormatter = new Intl.NumberFormat("az-AZ", {
@@ -51,36 +50,6 @@ export const orderStatusTones: Record<OrderStatus, BadgeTone> = {
   CANCELLED: "red",
 };
 
-export const revisionStatusLabels: Record<RevisionStatus, string> = {
-  DRAFT: "Qaralama",
-  AWAITING_CUSTOMER: "Müştəri cavabı gözlənilir",
-  ACCEPTED: "Qəbul edilib",
-  REJECTED: "Müştəri qəbul etmədi",
-  SUPERSEDED: "Geri çağırılıb",
-};
-
-export const revisionStatusTones: Record<RevisionStatus, BadgeTone> = {
-  DRAFT: "neutral",
-  AWAITING_CUSTOMER: "amber",
-  ACCEPTED: "green",
-  REJECTED: "red",
-  SUPERSEDED: "neutral",
-};
-
-// Items of a revision as returned (JSON) by the revision RPCs.
-export type RevisionItem = {
-  product_id: string;
-  sku: string;
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  line_total: number;
-};
-
-export function revisionItems(value: unknown): RevisionItem[] {
-  return Array.isArray(value) ? (value as RevisionItem[]) : [];
-}
-
 export const priceGroupLabels: Record<PriceGroup, string> = {
   NORMAL: "Normal",
   DEALER: "Diler",
@@ -119,12 +88,10 @@ export const staffRoleLabels: Record<StaffRole, string> = {
   WAREHOUSE: "Anbar",
 };
 
-// Category name indented by depth for <select> lists (options cannot hold
-// markup, so non-breaking spaces keep the indentation).
-// get_admin_categories counts depth from 1 (top level = 1).
-export function categoryOptionLabel(category: { depth: number; name: string }) {
-  const level = Math.max(0, category.depth - 1);
-  const indent = String.fromCharCode(160).repeat(level * 3);
+// Same limit as private.validate_category_parent in the database.
+export const maxCategoryDepth = 10;
 
-  return level > 0 ? `${indent}└ ${category.name}` : category.name;
+// "A / B / C" (get_admin_categories path) -> "A › B › C".
+export function categoryPath(path: string) {
+  return path.split(" / ").join(" › ");
 }

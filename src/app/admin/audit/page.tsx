@@ -21,6 +21,7 @@ const actionLabels: Record<string, string> = {
   customer_created: "Müştəri hesabı yaradıldı",
   customer_password_reset: "Müştəri şifrəsi sıfırlandı",
   customer_password_changed: "Müştəri şifrəsi dəyişdirildi",
+  order_items_updated: "Sifariş dəyişdirildi (miqdar/qiymət/məhsul)",
   order_revision_created: "Sifariş dəyişikliyi yaradıldı",
   order_revision_updated: "Sifariş dəyişikliyi yeniləndi",
   order_revision_sent: "Dəyişiklik müştəriyə göndərildi",

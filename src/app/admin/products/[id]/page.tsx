@@ -6,7 +6,7 @@ import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, Field, PageHeader } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
-import { categoryOptionLabel, uuidPattern } from "@/lib/format";
+import { categoryPath, formatAzn, uuidPattern } from "@/lib/format";
 import { can } from "@/lib/roles";
 import { signMediaPaths } from "@/lib/media";
 
@@ -19,7 +19,7 @@ import {
   updateProductContent,
   updateProductStock,
 } from "../actions";
-import PriceBoxes from "../PriceBoxes";
+import ProductPriceFields from "../ProductPriceFields";
 import ProductImageUploader from "../ProductImageUploader";
 import ProductVideoUpload from "../ProductVideoUpload";
 
@@ -158,11 +158,16 @@ export default async function AdminProductDetailPage({
         title={product.name}
         description={`SKU: ${product.sku}`}
         actions={
-          product.active ? (
-            <Badge tone="green">Aktiv · satışda</Badge>
-          ) : (
-            <Badge tone="red">Deaktiv · gizli</Badge>
-          )
+          <div className="flex flex-wrap gap-2">
+            {product.active ? (
+              <Badge tone="green">Aktiv · satışda</Badge>
+            ) : (
+              <Badge tone="red">Deaktiv · gizli</Badge>
+            )}
+            {product.sale_price !== null && (
+              <Badge tone="red">Endirim: {formatAzn(product.sale_price)}</Badge>
+            )}
+          </div>
         }
       />
 
@@ -210,7 +215,7 @@ export default async function AdminProductDetailPage({
                 </option>
                 {(categories ?? []).map((category) => (
                   <option key={category.id} value={category.id}>
-                    {categoryOptionLabel(category)}
+                    {categoryPath(category.path)}
                     {category.available ? "" : " (deaktiv)"}
                   </option>
                 ))}
@@ -244,31 +249,35 @@ export default async function AdminProductDetailPage({
           <ActionForm action={updateProduct} className="space-y-4">
             <input type="hidden" name="productId" value={product.id} />
 
-            <PriceBoxes
-              defaults={{
-                normal: product.normal_price,
-                dealer: product.dealer_price,
-                vip: product.vip_price,
+            <ProductPriceFields
+              hadGroupPrices={product.dealer_price !== null || product.vip_price !== null}
+              initial={{
+                normal: product.normal_price === null ? "" : Number(product.normal_price).toFixed(2),
+                groupPrices: product.dealer_price !== null || product.vip_price !== null,
+                dealer: product.dealer_price === null ? "" : Number(product.dealer_price).toFixed(2),
+                vip: product.vip_price === null ? "" : Number(product.vip_price).toFixed(2),
+                onSale: product.sale_price !== null,
+                sale: product.sale_price === null ? "" : Number(product.sale_price).toFixed(2),
               }}
-            />
-
-            <Field label="Stok miqdarı *" htmlFor="stock">
-              <input
-                id="stock"
-                type="number"
-                name="stock"
-                min={0}
-                step={1}
-                inputMode="numeric"
-                required
-                defaultValue={product.stock}
-                className="input text-lg"
-              />
-            </Field>
-
-            <p className="text-xs text-zinc-500">
-              Müştəri yalnız öz qrupunun qiymətini görür.
-            </p>
+            >
+              <div className="rounded-xl border-2 border-zinc-800 bg-zinc-950 p-3">
+                <label htmlFor="stock" className="block font-semibold text-white">
+                  Stok *
+                </label>
+                <p className="mb-2 text-xs text-zinc-500">Anbarda neçə ədəd var</p>
+                <input
+                  id="stock"
+                  type="number"
+                  name="stock"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  required
+                  defaultValue={product.stock}
+                  className="input text-2xl font-bold"
+                />
+              </div>
+            </ProductPriceFields>
 
             <SubmitButton pendingText="Yadda saxlanılır...">
               Yadda saxla

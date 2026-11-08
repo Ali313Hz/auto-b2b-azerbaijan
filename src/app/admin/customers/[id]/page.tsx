@@ -14,7 +14,6 @@ import {
   orderStatusLabels,
   orderStatusTones,
   priceGroupLabels,
-  priceGroups,
   shortId,
 } from "@/lib/format";
 
@@ -25,7 +24,6 @@ import {
   setCustomerPassword,
   updateCustomerActive,
   updateCustomerEmail,
-  updateCustomerPriceGroup,
   updateCustomerProfile,
   resetCustomerMfa,
 } from "../actions";
@@ -155,9 +153,7 @@ export default async function AdminCustomerDetailPage({
 
         <div className="space-y-6">
           <section className="card p-5 sm:p-6">
-            <h2 className="mb-4 font-semibold text-white">
-              Qiymət qrupu və status
-            </h2>
+            <h2 className="mb-4 font-semibold text-white">Status</h2>
 
             {isArchived ? (
               <p className="text-sm text-zinc-500">
@@ -165,42 +161,13 @@ export default async function AdminCustomerDetailPage({
               </p>
             ) : !canEdit ? (
               <p className="text-sm text-zinc-400">
-                Qiymət qrupu: {priceGroupLabels[customer.price_group]} · Status:{" "}
-                {customer.active ? "Aktiv" : "Deaktiv"}. Rolunuz yalnız baxmağa
-                icazə verir.
+                Status: {customer.active ? "Aktiv" : "Deaktiv"}. Rolunuz yalnız
+                baxmağa icazə verir.
               </p>
             ) : (
               <div className="space-y-4">
                 <ActionForm
-                  action={updateCustomerPriceGroup}
-                  className="flex flex-wrap items-end gap-3"
-                >
-                  <input type="hidden" name="customerId" value={customer.id} />
-
-                  <div className="w-48">
-                    <Field label="Qiymət qrupu" htmlFor="priceGroup">
-                      <select
-                        key={customer.price_group}
-                        id="priceGroup"
-                        name="priceGroup"
-                        defaultValue={customer.price_group}
-                        className="input"
-                      >
-                        {priceGroups.map((group) => (
-                          <option key={group} value={group}>
-                            {priceGroupLabels[group]}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-
-                  <SubmitButton pendingText="...">Qrupu yadda saxla</SubmitButton>
-                </ActionForm>
-
-                <ActionForm
                   action={updateCustomerActive}
-                  className="border-t border-zinc-800 pt-4"
                   confirmMessage={
                     customer.active
                       ? "Müştəri deaktiv edilsin? O, daxil ola və sifariş verə bilməyəcək."

@@ -39,27 +39,30 @@ const dbMessages: Record<string, string> = {
   "Category cannot be its own parent":
     "Kateqoriya özünün ana kateqoriyası ola bilməz.",
   "Category hierarchy too deep":
-    "Kateqoriya ağacı ən çox 3 səviyyəli ola bilər.",
+    "Kateqoriya ağacı ən çox 10 səviyyəli ola bilər.",
   "Parent category not found": "Ana kateqoriya tapılmadı.",
   "Category name is required": "Kateqoriya adı mütləqdir (maks. 100 simvol).",
   "Category slug is required":
     "Slug yalnız kiçik latın hərfləri, rəqəmlər və tire ola bilər.",
   "Cancelled orders cannot be changed": "Ləğv edilmiş sifariş dəyişdirilə bilməz.",
-  "Revision not found": "Dəyişiklik tapılmadı.",
-  "Only drafts can be edited":
-    "Bu dəyişiklik artıq müştəriyə göndərilib. Yeni dəyişiklik yaradın.",
-  "Only drafts can be sent": "Bu dəyişiklik artıq göndərilib.",
-  "Only revisions awaiting the customer can be re-sent":
-    "Yalnız müştəri cavabını gözləyən dəyişiklik yenidən göndərilə bilər.",
-  "Revision has no items": "Sifarişdə ən azı bir məhsul olmalıdır.",
-  "Revision is no longer open":
-    "Bu dəyişiklik artıq bağlanıb. Səhifəni yeniləyin.",
   "Order is cancelled": "Sifariş ləğv edilib.",
   "Invalid quantity": "Miqdar 1 ilə 100 000 arasında tam ədəd olmalıdır.",
   "Invalid price": "Qiymət 0 və ya daha böyük olmalıdır.",
   "Invalid order items": "Sifariş məhsulları yanlışdır.",
   "Duplicate product": "Eyni məhsul iki dəfə əlavə edilib.",
-  "Note is too long": "Qeyd ən çox 2000 simvol ola bilər.",
+  "Order must have at least one product":
+    "Sifarişdə ən azı bir məhsul qalmalıdır. Hamısını silmək üçün sifarişi ləğv edin.",
+  "Only pending orders can be edited":
+    "Yalnız gözləyən sifarişlər dəyişdirilə bilər.",
+  "Order was changed by someone else":
+    "Bu sifarişi başqa əməkdaş indicə dəyişdi. Səhifəni yeniləyib yenidən yoxlayın.",
+  "Product is not available": "Bu məhsul satışda deyil, əlavə etmək olmaz.",
+  "Normal price is required": "Normal qiymət mütləqdir.",
+  "Prices cannot be negative": "Qiymət mənfi ola bilməz.",
+  "Price is too high": "Qiymət çox böyükdür.",
+  "Sale price must be lower than normal price":
+    "Endirimli qiymət normal qiymətdən aşağı olmalıdır.",
+  "Stock cannot be negative": "Stok 0 və ya daha böyük tam ədəd olmalıdır.",
 };
 
 export function dbErrorMessage(

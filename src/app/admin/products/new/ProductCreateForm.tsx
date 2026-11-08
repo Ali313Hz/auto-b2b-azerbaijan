@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 
-import { categoryOptionLabel, formatAzn } from "@/lib/format";
+import { categoryPath, formatAzn } from "@/lib/format";
 
 import { createProductDraft, updateProductActive } from "../actions";
 import MediaDropZone from "../MediaDropZone";
@@ -17,7 +17,11 @@ import {
   videoAccept,
   videoProblem,
 } from "../media-upload";
-import PriceBoxes, { type PriceValues } from "../PriceBoxes";
+import ProductPriceFields, {
+  emptyPrices,
+  type PriceState,
+  priceProblem,
+} from "../ProductPriceFields";
 
 export type CategoryOption = {
   id: string;
@@ -34,10 +38,6 @@ type Phase =
   | { kind: "working"; text: string }
   | { kind: "done" }
   | { kind: "partial"; productId: string; problems: string[] };
-
-function breadcrumb(path: string) {
-  return path.split(" / ").join(" → ");
-}
 
 function pick(files: File[], check: (file: File) => string | null) {
   const accepted: PickedFile[] = [];
@@ -69,7 +69,7 @@ export default function ProductCreateForm({
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [stock, setStock] = useState("");
-  const [prices, setPrices] = useState<PriceValues>({ normal: "", dealer: "", vip: "" });
+  const [prices, setPrices] = useState<PriceState>(emptyPrices);
   const [active, setActive] = useState(true);
 
   const [images, setImages] = useState<PickedFile[]>([]);
@@ -137,15 +137,7 @@ export default function ProductCreateForm({
       return "Stok miqdarı 0 və ya daha böyük tam ədəd olmalıdır.";
     }
 
-    for (const value of [prices.normal, prices.dealer, prices.vip]) {
-      const price = Number(value);
-
-      if (value.trim() === "" || !Number.isFinite(price) || price < 0) {
-        return "Hər üç qiyməti yazın (0 və ya daha böyük).";
-      }
-    }
-
-    return null;
+    return priceProblem(prices);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -175,8 +167,11 @@ export default function ProductCreateForm({
     formData.set("description", description.trim());
     formData.set("stock", stock.trim());
     formData.set("normalPrice", prices.normal.trim());
+    formData.set("groupPrices", prices.groupPrices ? "1" : "");
     formData.set("dealerPrice", prices.dealer.trim());
     formData.set("vipPrice", prices.vip.trim());
+    formData.set("onSale", prices.onSale ? "1" : "");
+    formData.set("salePrice", prices.sale.trim());
 
     let created: Awaited<ReturnType<typeof createProductDraft>>;
 
@@ -272,11 +267,18 @@ export default function ProductCreateForm({
 
   const summary = [
     { label: "Məhsul adı", value: name.trim() || "—" },
-    { label: "Kateqoriya", value: category ? breadcrumb(category.path) : "—" },
+    { label: "Kateqoriya", value: category ? categoryPath(category.path) : "—" },
     { label: "Stok", value: stock.trim() ? `${stock.trim()} əd.` : "—" },
     { label: "Normal qiymət", value: prices.normal.trim() ? formatAzn(prices.normal) : "—" },
-    { label: "Diler qiyməti", value: prices.dealer.trim() ? formatAzn(prices.dealer) : "—" },
-    { label: "VIP qiyməti", value: prices.vip.trim() ? formatAzn(prices.vip) : "—" },
+    ...(prices.onSale
+      ? [{ label: "Endirimli qiymət", value: prices.sale.trim() ? formatAzn(prices.sale) : "—" }]
+      : []),
+    ...(prices.groupPrices
+      ? [
+          { label: "Diler qiyməti", value: prices.dealer.trim() ? formatAzn(prices.dealer) : "—" },
+          { label: "VIP qiyməti", value: prices.vip.trim() ? formatAzn(prices.vip) : "—" },
+        ]
+      : []),
     { label: "Şəkil sayı", value: String(images.length) },
     { label: "Video sayı", value: String(videos.length) },
     { label: "Status", value: active ? "Aktiv (satışda)" : "Deaktiv (gizli)" },
@@ -338,13 +340,13 @@ export default function ProductCreateForm({
               </option>
               {categories.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {categoryOptionLabel(item)}
+                  {categoryPath(item.path)}
                   {item.available ? "" : " (deaktiv)"}
                 </option>
               ))}
             </select>
             {category && (
-              <p className="mt-1 text-sm text-amber-300">{breadcrumb(category.path)}</p>
+              <p className="mt-1 text-sm text-amber-300">{categoryPath(category.path)}</p>
             )}
           </div>
 
@@ -367,13 +369,12 @@ export default function ProductCreateForm({
         <section className="card space-y-4 p-4 sm:p-6">
           <SectionTitle number={2} title="Qiymət və stok" />
 
-          <PriceBoxes values={prices} onChange={setPrices} />
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="min-w-0">
-              <label htmlFor="stock" className="label">
-                Stok miqdarı *
+          <ProductPriceFields value={prices} onChange={setPrices}>
+            <div className="rounded-xl border-2 border-zinc-800 bg-zinc-950 p-3">
+              <label htmlFor="stock" className="block font-semibold text-white">
+                Stok *
               </label>
+              <p className="mb-2 text-xs text-zinc-500">Anbarda neçə ədəd var</p>
               <input
                 id="stock"
                 type="number"
@@ -383,11 +384,13 @@ export default function ProductCreateForm({
                 value={stock}
                 onChange={(event) => setStock(event.target.value)}
                 required
-                className="input text-lg"
+                className="input text-2xl font-bold"
                 placeholder="0"
               />
             </div>
+          </ProductPriceFields>
 
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="min-w-0">
               <span className="label">Status</span>
               <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Status">

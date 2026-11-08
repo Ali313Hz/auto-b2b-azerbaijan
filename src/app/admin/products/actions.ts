@@ -45,39 +45,61 @@ function readText(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : null;
 }
 
-function parseStockAndPrices(formData: FormData) {
-  const values = {
-    stock: readText(formData, "stock"),
-    normalPrice: readText(formData, "normalPrice"),
-    dealerPrice: readText(formData, "dealerPrice"),
-    vipPrice: readText(formData, "vipPrice"),
-  };
+function readMoney(formData: FormData, key: string) {
+  const text = (readText(formData, key) ?? "").replace(",", ".");
 
-  if (Object.values(values).some((value) => !value)) {
+  if (text === "") {
     return null;
   }
 
-  const stock = Number(values.stock);
-  const prices = [
-    Number(values.normalPrice),
-    Number(values.dealerPrice),
-    Number(values.vipPrice),
-  ];
+  const value = Number(text);
 
-  if (
-    !Number.isInteger(stock) ||
-    stock < 0 ||
-    prices.some((price) => !Number.isFinite(price) || price < 0)
-  ) {
-    return null;
+  return Number.isFinite(value) && value >= 0 && value <= 100_000_000
+    ? Math.round(value * 100) / 100
+    : NaN;
+}
+
+// Stock + prices from ProductPriceFields. NORMAL is required; dealer / VIP
+// only when "Diler və VIP qiymətləri əlavə et" is ticked, the sale price
+// only when "Bu məhsul endirimdədir" is ticked. Unticked = NULL (not set).
+function parseStockAndPrices(
+  formData: FormData
+): { ok: true; value: {
+  stock: number;
+  normalPrice: number;
+  dealerPrice: number | null;
+  vipPrice: number | null;
+  salePrice: number | null;
+} } | { ok: false; message: string } {
+  const stock = Number(readText(formData, "stock"));
+  const normalPrice = readMoney(formData, "normalPrice");
+  const groupPrices = readText(formData, "groupPrices") === "1";
+  const onSale = readText(formData, "onSale") === "1";
+  const dealerPrice = groupPrices ? readMoney(formData, "dealerPrice") : null;
+  const vipPrice = groupPrices ? readMoney(formData, "vipPrice") : null;
+  const salePrice = onSale ? readMoney(formData, "salePrice") : null;
+
+  if (!Number.isInteger(stock) || stock < 0 || stock > 1_000_000) {
+    return { ok: false, message: "Stok 0 və ya daha böyük tam ədəd olmalıdır." };
   }
 
-  return {
-    stock,
-    normalPrice: prices[0],
-    dealerPrice: prices[1],
-    vipPrice: prices[2],
-  };
+  if (normalPrice === null || Number.isNaN(normalPrice)) {
+    return { ok: false, message: "Normal qiyməti yazın (0 və ya daha böyük)." };
+  }
+
+  if (groupPrices && (dealerPrice === null || vipPrice === null || Number.isNaN(dealerPrice) || Number.isNaN(vipPrice))) {
+    return { ok: false, message: "Diler və VIP qiymətlərini yazın və ya işarəni götürün." };
+  }
+
+  if (onSale && (salePrice === null || Number.isNaN(salePrice))) {
+    return { ok: false, message: "Endirimli qiyməti yazın və ya işarəni götürün." };
+  }
+
+  if (salePrice !== null && salePrice >= normalPrice) {
+    return { ok: false, message: "Endirimli qiymət normal qiymətdən aşağı olmalıdır." };
+  }
+
+  return { ok: true, value: { stock, normalPrice, dealerPrice, vipPrice, salePrice } };
 }
 
 export type CreateProductDraftResult =
@@ -104,11 +126,8 @@ export async function createProductDraft(
     return { ok: false, message: "Kateqoriya seçin." };
   }
 
-  if (!numbers) {
-    return {
-      ok: false,
-      message: "Stok tam ədəd, qiymətlər isə 0 və ya daha böyük olmalıdır.",
-    };
+  if (!numbers.ok) {
+    return numbers;
   }
 
   const supabase = await getAuthedClient();
@@ -116,10 +135,11 @@ export async function createProductDraft(
   const { data: productId, error } = await supabase.rpc("create_admin_product", {
     p_sku: sku,
     p_category_id: categoryId,
-    p_stock: numbers.stock,
-    p_normal_price: numbers.normalPrice,
-    p_dealer_price: numbers.dealerPrice,
-    p_vip_price: numbers.vipPrice,
+    p_stock: numbers.value.stock,
+    p_normal_price: numbers.value.normalPrice,
+    p_dealer_price: numbers.value.dealerPrice,
+    p_vip_price: numbers.value.vipPrice,
+    p_sale_price: numbers.value.salePrice,
     p_active: false,
   });
 
@@ -153,18 +173,19 @@ export async function updateProduct(
     return fail("Məhsul məlumatı yanlışdır.");
   }
 
-  if (!numbers) {
-    return fail("Stok tam ədəd, qiymətlər isə 0 və ya daha böyük olmalıdır.");
+  if (!numbers.ok) {
+    return fail(numbers.message);
   }
 
   const supabase = await getAuthedClient();
 
-  const { error } = await supabase.rpc("update_admin_product", {
+  const { error } = await supabase.rpc("update_admin_product_pricing", {
     p_product_id: productId,
-    p_stock: numbers.stock,
-    p_normal_price: numbers.normalPrice,
-    p_dealer_price: numbers.dealerPrice,
-    p_vip_price: numbers.vipPrice,
+    p_stock: numbers.value.stock,
+    p_normal_price: numbers.value.normalPrice,
+    p_dealer_price: numbers.value.dealerPrice,
+    p_vip_price: numbers.value.vipPrice,
+    p_sale_price: numbers.value.salePrice,
   });
 
   if (error) {

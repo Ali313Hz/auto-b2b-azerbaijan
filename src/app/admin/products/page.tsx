@@ -5,7 +5,8 @@ import Pagination from "@/components/Pagination";
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { can } from "@/lib/roles";
-import { categoryOptionLabel, formatAzn, readPage, uuidPattern } from "@/lib/format";
+import { categoryPath, formatAzn, readPage, uuidPattern } from "@/lib/format";
+import { signCardImages } from "@/lib/media";
 
 const PAGE_SIZE = 50;
 
@@ -23,7 +24,7 @@ export default async function AdminProductsPage({
       ? params.category
       : "";
   const statusFilter =
-    params.status === "active" || params.status === "inactive"
+    params.status === "active" || params.status === "inactive" || params.status === "sale"
       ? params.status
       : "";
   const lowStockOnly = params.stock === "low";
@@ -57,6 +58,10 @@ export default async function AdminProductsPage({
 
   const visibleProducts = products ?? [];
   const total = visibleProducts[0]?.total_count ?? 0;
+  const imageUrls = await signCardImages(
+    supabase,
+    visibleProducts.map((product) => product.primary_image_path)
+  );
 
   const hasFilters = Boolean(
     query || categoryFilter || statusFilter || lowStockOnly
@@ -108,7 +113,7 @@ export default async function AdminProductsPage({
             <option value="">Hamısı</option>
             {(categories ?? []).map((category) => (
               <option key={category.id} value={category.id}>
-                {categoryOptionLabel(category)}
+                {categoryPath(category.path)}
               </option>
             ))}
           </select>
@@ -127,6 +132,7 @@ export default async function AdminProductsPage({
             <option value="">Hamısı</option>
             <option value="active">Aktiv</option>
             <option value="inactive">Deaktiv</option>
+            {canEdit && <option value="sale">Endirimdə</option>}
           </select>
         </div>
 
@@ -169,7 +175,8 @@ export default async function AdminProductsPage({
                   className="card block space-y-2 p-4 hover:border-zinc-700"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <Thumb url={product.primary_image_path ? imageUrls.get(product.primary_image_path) : undefined} />
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium break-words text-white">{product.name}</p>
                       <p className="font-mono text-xs text-zinc-500">{product.sku}</p>
                     </div>
@@ -185,22 +192,7 @@ export default async function AdminProductsPage({
                       <span className="text-zinc-500">Stok: </span>
                       <StockValue stock={product.stock} />
                     </span>
-                    {canEdit && (
-                      <>
-                        <span className="text-zinc-300">
-                          <span className="text-zinc-500">N: </span>
-                          {formatAzn(product.normal_price)}
-                        </span>
-                        <span className="text-zinc-300">
-                          <span className="text-zinc-500">D: </span>
-                          {formatAzn(product.dealer_price)}
-                        </span>
-                        <span className="text-zinc-300">
-                          <span className="text-zinc-500">VIP: </span>
-                          {formatAzn(product.vip_price)}
-                        </span>
-                      </>
-                    )}
+                    {canEdit && <PriceValue normal={product.normal_price} sale={product.sale_price} />}
                   </div>
                 </Link>
               </li>
@@ -212,10 +204,12 @@ export default async function AdminProductsPage({
             <table className="table min-w-0 table-fixed">
               <thead>
                 <tr>
-                  <th className={canEdit ? "w-[34%]" : "w-[45%]"}>Məhsul</th>
+                  <th className="w-16">Şəkil</th>
+                  <th className={canEdit ? "w-[32%]" : "w-[42%]"}>Məhsul</th>
                   <th>Kateqoriya</th>
-                  <th className="w-20 text-right">Stok</th>
-                  {canEdit && <th className="w-36 text-right">Qiymətlər</th>}
+                  <th className="w-16 text-right">Stok</th>
+                  {canEdit && <th className="w-28 text-right">Normal qiymət</th>}
+                  {canEdit && <th className="w-28 text-right">Endirim</th>}
                   <th className="w-24">Status</th>
                 </tr>
               </thead>
@@ -223,6 +217,9 @@ export default async function AdminProductsPage({
               <tbody>
                 {visibleProducts.map((product) => (
                   <tr key={product.id} className="hover:bg-zinc-900/60">
+                    <td>
+                      <Thumb url={product.primary_image_path ? imageUrls.get(product.primary_image_path) : undefined} />
+                    </td>
                     <td>
                       <Link
                         href={`/admin/products/${product.id}`}
@@ -242,19 +239,17 @@ export default async function AdminProductsPage({
                       <StockValue stock={product.stock} />
                     </td>
                     {canEdit && (
-                      <td className="text-right text-xs leading-5 whitespace-nowrap">
-                        <span className="block text-zinc-200">
-                          <span className="text-zinc-500">N </span>
-                          {formatAzn(product.normal_price)}
-                        </span>
-                        <span className="block text-zinc-300">
-                          <span className="text-zinc-500">D </span>
-                          {formatAzn(product.dealer_price)}
-                        </span>
-                        <span className="block text-amber-300">
-                          <span className="text-zinc-500">VIP </span>
-                          {formatAzn(product.vip_price)}
-                        </span>
+                      <td className={`text-right whitespace-nowrap ${product.sale_price !== null ? "text-zinc-500 line-through" : "text-zinc-200"}`}>
+                        {formatAzn(product.normal_price)}
+                      </td>
+                    )}
+                    {canEdit && (
+                      <td className="text-right whitespace-nowrap">
+                        {product.sale_price !== null ? (
+                          <span className="font-semibold text-red-400">{formatAzn(product.sale_price)}</span>
+                        ) : (
+                          <span className="text-zinc-600">—</span>
+                        )}
                       </td>
                     )}
                     <td>
@@ -285,6 +280,31 @@ export default async function AdminProductsPage({
         }}
       />
     </>
+  );
+}
+
+function Thumb({ url }: { url?: string }) {
+  return (
+    <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-md bg-zinc-950">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
+      ) : (
+        <span className="text-[10px] text-zinc-600">yoxdur</span>
+      )}
+    </span>
+  );
+}
+
+function PriceValue({ normal, sale }: { normal: number | null; sale: number | null }) {
+  return sale !== null ? (
+    <span className="flex items-baseline gap-2">
+      <span className="text-zinc-500 line-through">{formatAzn(normal)}</span>
+      <span className="font-semibold text-red-400">{formatAzn(sale)}</span>
+      <Badge tone="red">Endirim</Badge>
+    </span>
+  ) : (
+    <span className="text-zinc-200">{formatAzn(normal)}</span>
   );
 }
 
