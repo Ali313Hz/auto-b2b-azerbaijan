@@ -4,7 +4,6 @@ import Link from "next/link";
 import SubmitButton from "@/components/SubmitButton";
 import { Badge, PageHeader } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
-import { priceGroupLabels } from "@/lib/format";
 import { SHOW_MFA_SETTINGS } from "@/lib/mfa";
 
 import { logout } from "./actions";
@@ -38,15 +37,6 @@ export default async function AccountPage() {
               <dd className="break-words text-zinc-100">{value}</dd>
             </div>
           ))}
-
-          <div className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[160px_1fr]">
-            <dt className="text-sm text-zinc-400">Qiymət qrupu</dt>
-            <dd>
-              <Badge tone="blue">
-                {priceGroupLabels[customer.price_group]}
-              </Badge>
-            </dd>
-          </div>
 
           <div className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-[160px_1fr]">
             <dt className="text-sm text-zinc-400">Status</dt>

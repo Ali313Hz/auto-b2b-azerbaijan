@@ -1,14 +1,23 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
-import { formatAzn, type RevisionItem } from "@/lib/format";
+import { formatAzn } from "@/lib/format";
 
 import {
   type OrderProductOption,
-  saveOrderRevision,
+  saveOrderItems,
   searchOrderProducts,
 } from "../actions";
+
+export type OrderLine = {
+  product_id: string;
+  sku: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  stock: number | null;
+};
 
 type EditorItem = {
   product_id: string;
@@ -16,62 +25,52 @@ type EditorItem = {
   name: string;
   quantity: string;
   unit_price: string;
-};
-
-type OrderRevisionEditorProps = {
-  orderId: string;
-  revisionId: string;
-  version: number;
-  initialItems: RevisionItem[];
-  initialNote: string;
-  // Currently accepted order items, to show "before" values.
-  currentItems: RevisionItem[];
-  priceGroupLabel: string;
+  // Stock left in the warehouse (the order's own quantity is already taken).
+  stock: number | null;
 };
 
 function toNumber(value: string) {
-  const number = Number(value.replace(",", ".").trim());
+  const text = value.replace(",", ".").trim();
 
-  return Number.isFinite(number) ? number : NaN;
+  return text === "" ? NaN : Number(text);
 }
 
-export default function OrderRevisionEditor({
+function fromLines(lines: OrderLine[]): EditorItem[] {
+  return lines.map((line) => ({
+    product_id: line.product_id,
+    sku: line.sku,
+    name: line.product_name,
+    quantity: String(line.quantity),
+    unit_price: Number(line.unit_price).toFixed(2),
+    stock: line.stock,
+  }));
+}
+
+// Edits a PENDING order in place (OWNER, SALES). Saving changes the order,
+// moves stock by the difference and writes the change history; the
+// database recalculates every total.
+export default function OrderEditor({
   orderId,
-  revisionId,
-  version,
-  initialItems,
-  initialNote,
-  currentItems,
-  priceGroupLabel,
-}: OrderRevisionEditorProps) {
-  const [state, formAction, pending] = useActionState(saveOrderRevision, null);
-  const [items, setItems] = useState<EditorItem[]>(() =>
-    initialItems.map((item) => ({
-      product_id: item.product_id,
-      sku: item.sku,
-      name: item.product_name,
-      quantity: String(item.quantity),
-      unit_price: Number(item.unit_price).toFixed(2),
-    }))
-  );
-  const [note, setNote] = useState(initialNote);
-  const [confirmSend, setConfirmSend] = useState(false);
+  updatedAt,
+  lines,
+}: {
+  orderId: string;
+  updatedAt: string;
+  lines: OrderLine[];
+}) {
+  const [state, formAction, pending] = useActionState(saveOrderItems, null);
+  const [items, setItems] = useState<EditorItem[]>(() => fromLines(lines));
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<OrderProductOption[]>([]);
   const [searching, setSearching] = useState(false);
-  const [handledState, setHandledState] = useState(state);
-  const sendRef = useRef<HTMLButtonElement>(null);
+  const [baseVersion, setBaseVersion] = useState(updatedAt);
 
-  if (state !== handledState) {
-    setHandledState(state);
-    setConfirmSend(false);
+  // The saved order came back from the server: start from it again
+  // (keeps the success message, unlike remounting).
+  if (baseVersion !== updatedAt) {
+    setBaseVersion(updatedAt);
+    setItems(fromLines(lines));
   }
-
-  useEffect(() => {
-    if (confirmSend) {
-      sendRef.current?.focus();
-    }
-  }, [confirmSend]);
 
   // Product search (debounced).
   useEffect(() => {
@@ -98,7 +97,7 @@ export default function OrderRevisionEditor({
     };
   }, [search, orderId]);
 
-  const before = new Map(currentItems.map((item) => [item.product_id, item]));
+  const before = new Map(lines.map((line) => [line.product_id, line]));
 
   function update(index: number, patch: Partial<EditorItem>) {
     setItems((list) => list.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -125,6 +124,7 @@ export default function OrderRevisionEditor({
           name: product.name,
           quantity: "1",
           unit_price: product.catalog_price === null ? "" : Number(product.catalog_price).toFixed(2),
+          stock: product.stock,
         },
       ]);
     }
@@ -133,58 +133,76 @@ export default function OrderRevisionEditor({
     setResults([]);
   }
 
-  const lines = items.map((item) => {
+  const rows = items.map((item) => {
     const quantity = Number.parseInt(item.quantity, 10);
     const price = toNumber(item.unit_price);
     const valid =
       /^\d+$/.test(item.quantity.trim()) &&
       quantity >= 1 &&
       quantity <= 100000 &&
-      item.unit_price.trim() !== "" &&
-      price >= 0;
+      Number.isFinite(price) &&
+      price >= 0 &&
+      /^\d+([.,]\d{1,2})?$/.test(item.unit_price.trim());
+    const old = before.get(item.product_id);
+    // Stock that can still be taken: free stock + what this order holds.
+    const available = item.stock === null ? null : item.stock + (old?.quantity ?? 0);
 
-    return { valid, total: valid ? Math.round(quantity * price * 100) / 100 : null };
+    return {
+      valid,
+      quantity,
+      price,
+      total: valid ? Math.round(quantity * price * 100) / 100 : null,
+      old,
+      tooMuch: valid && available !== null && quantity > available,
+      available,
+    };
   });
-  const allValid = lines.every((line) => line.valid);
-  const total = lines.reduce((sum, line) => sum + (line.total ?? 0), 0);
+  const removed = lines.filter((line) => !items.some((item) => item.product_id === line.product_id));
+  const changed =
+    removed.length > 0 ||
+    rows.some(
+      (row) =>
+        !row.old ||
+        !row.valid ||
+        row.quantity !== row.old.quantity ||
+        Math.round(row.price * 100) !== Math.round(Number(row.old.unit_price) * 100)
+    );
+  const allValid = rows.every((row) => row.valid);
+  const total = rows.reduce((sum, row) => sum + (row.total ?? 0), 0);
   const payload = JSON.stringify(
     items.map((item) => ({
       product_id: item.product_id,
       quantity: Number.parseInt(item.quantity, 10),
-      unit_price: item.unit_price,
+      unit_price: item.unit_price.replace(",", ".").trim(),
     }))
-  );
-  const removed = currentItems.filter(
-    (item) => !items.some((edited) => edited.product_id === item.product_id)
   );
 
   return (
     <form action={formAction} className="card space-y-5 p-4 sm:p-6">
       <input type="hidden" name="orderId" value={orderId} />
-      <input type="hidden" name="revisionId" value={revisionId} />
+      <input type="hidden" name="expectedUpdatedAt" value={updatedAt} />
       <input type="hidden" name="items" value={payload} />
 
       <div>
-        <h2 className="text-lg font-semibold text-white">
-          Dəyişiklik · Versiya {version}
-        </h2>
+        <h2 className="text-lg font-semibold text-white">Sifarişi dəyiş</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Qaralama: müştəri “Müştəriyə göndər” basılana qədər görmür. Stok
-          yalnız müştəri qəbul etdikdə dəyişir. Qiymət dəyişikliyi yalnız bu
-          sifarişə aiddir, kataloq qiymətləri ({priceGroupLabel}) dəyişmir.
+          Miqdarı, qiyməti dəyişin, məhsul silin və ya əlavə edin, sonra
+          “Dəyişiklikləri yadda saxla” basın. Qiymət dəyişikliyi yalnız bu
+          sifarişə aiddir, kataloq qiyməti dəyişmir. Müştəri yenilənmiş
+          sifarişi öz səhifəsində görəcək.
         </p>
       </div>
 
       {items.length === 0 && (
-        <p className="rounded-lg border border-dashed border-zinc-700 p-4 text-center text-sm text-zinc-400">
-          Sifarişdə məhsul qalmayıb. Aşağıdan məhsul əlavə edin.
+        <p className="rounded-lg border border-dashed border-red-800 p-4 text-center text-sm text-red-300">
+          Sifarişdə məhsul qalmayıb. Ən azı bir məhsul olmalıdır — bütün
+          sifarişi ləğv etmək üçün “Sifarişi ləğv et” düyməsini istifadə edin.
         </p>
       )}
 
       <ul className="space-y-3">
         {items.map((item, index) => {
-          const old = before.get(item.product_id);
-          const line = lines[index];
+          const row = rows[index];
 
           return (
             <li
@@ -195,17 +213,20 @@ export default function OrderRevisionEditor({
                 <div className="min-w-0">
                   <p className="font-semibold break-words text-white">{item.name}</p>
                   <p className="font-mono text-xs text-zinc-500">{item.sku}</p>
-                  {old ? (
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Əvvəl: {old.quantity} əd. × {formatAzn(old.unit_price)}
-                    </p>
+                  {row.old ? (
+                    (row.old.quantity !== row.quantity ||
+                      Math.round(row.price * 100) !== Math.round(Number(row.old.unit_price) * 100)) && (
+                      <p className="mt-1 text-xs text-amber-300">
+                        Əvvəl: {row.old.quantity} əd. × {formatAzn(row.old.unit_price)}
+                      </p>
+                    )
                   ) : (
                     <p className="mt-1 text-xs text-emerald-400">Yeni məhsul</p>
                   )}
                 </div>
                 <button
                   type="button"
-                  className="btn btn-sm btn-secondary shrink-0 text-red-300"
+                  className="btn btn-sm btn-danger shrink-0"
                   onClick={() => setItems((list) => list.filter((_, i) => i !== index))}
                   aria-label={`${item.name} sifarişdən sil`}
                 >
@@ -219,7 +240,7 @@ export default function OrderRevisionEditor({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      className="btn btn-secondary px-3"
+                      className="btn btn-secondary px-3 text-lg"
                       onClick={() => step(index, -1)}
                       aria-label="Azalt"
                     >
@@ -229,18 +250,21 @@ export default function OrderRevisionEditor({
                       inputMode="numeric"
                       value={item.quantity}
                       onChange={(event) => update(index, { quantity: event.target.value })}
-                      className="input w-20 text-center"
+                      className="input w-20 text-center text-lg font-semibold"
                       aria-label={`${item.name} miqdarı`}
                     />
                     <button
                       type="button"
-                      className="btn btn-secondary px-3"
+                      className="btn btn-secondary px-3 text-lg"
                       onClick={() => step(index, 1)}
                       aria-label="Artır"
                     >
                       +
                     </button>
                   </div>
+                  {row.tooMuch && (
+                    <p className="mt-1 text-xs text-red-400">Stokda cəmi {row.available} əd. var.</p>
+                  )}
                 </div>
 
                 <label className="block">
@@ -250,7 +274,7 @@ export default function OrderRevisionEditor({
                       inputMode="decimal"
                       value={item.unit_price}
                       onChange={(event) => update(index, { unit_price: event.target.value })}
-                      className="input pr-8"
+                      className="input pr-8 text-lg"
                       aria-label={`${item.name} vahid qiyməti`}
                     />
                     <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-zinc-500">
@@ -262,7 +286,7 @@ export default function OrderRevisionEditor({
                 <div className="sm:text-right">
                   <span className="label">Cəmi</span>
                   <p className="py-2 text-lg font-semibold text-white">
-                    {line.valid ? formatAzn(line.total) : <span className="text-sm text-red-400">Yanlış dəyər</span>}
+                    {row.valid ? formatAzn(row.total) : <span className="text-sm text-red-400">Yanlış dəyər</span>}
                   </p>
                 </div>
               </div>
@@ -274,13 +298,14 @@ export default function OrderRevisionEditor({
       {removed.length > 0 && (
         <div className="rounded-lg border border-red-900/60 bg-red-950/20 p-3 text-sm text-red-200">
           Sifarişdən çıxarılacaq:{" "}
-          {removed.map((item) => `${item.product_name} (${item.quantity} əd.)`).join(", ")}
+          {removed.map((line) => `${line.product_name} (${line.quantity} əd.)`).join(", ")}
+          . Stoka geri qaytarılacaq.
         </div>
       )}
 
       <div className="rounded-lg border border-zinc-800 p-3">
         <label htmlFor="productSearch" className="label">
-          Məhsul əlavə et
+          + Məhsul əlavə et
         </label>
         <input
           id="productSearch"
@@ -293,11 +318,14 @@ export default function OrderRevisionEditor({
               setResults([]);
             }
           }}
-          placeholder="Ad və ya SKU yazın (ən azı 2 simvol)"
+          placeholder="Məhsulun adını və ya SKU yazın"
           className="input"
           autoComplete="off"
         />
         {searching && <p className="mt-2 text-xs text-zinc-500">Axtarılır...</p>}
+        {!searching && search.trim().length >= 2 && results.length === 0 && (
+          <p className="mt-2 text-xs text-zinc-500">Satışda belə məhsul tapılmadı.</p>
+        )}
         {results.length > 0 && (
           <ul className="mt-2 max-h-72 divide-y divide-zinc-800 overflow-y-auto rounded-lg border border-zinc-800">
             {results.map((product) => (
@@ -307,7 +335,6 @@ export default function OrderRevisionEditor({
                   <p className="text-xs text-zinc-500">
                     <span className="font-mono">{product.sku}</span> · Stok: {product.stock} ·{" "}
                     {formatAzn(product.catalog_price)}
-                    {!product.active && <span className="text-amber-400"> · satışda deyil</span>}
                   </p>
                 </div>
                 <button
@@ -323,27 +350,11 @@ export default function OrderRevisionEditor({
         )}
       </div>
 
-      <div>
-        <label htmlFor="revisionNote" className="label">
-          Satıcı qeydi (müştəri görəcək)
-        </label>
-        <textarea
-          id="revisionNote"
-          name="note"
-          rows={3}
-          maxLength={2000}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          className="input"
-          placeholder="Məs: H7 LED stokda 1 ədəd qalıb, qiymət endirimlə 42 ₼."
-        />
-      </div>
-
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-zinc-800 pt-4">
-        <span className="text-zinc-400">Yeni cəm (təxmini)</span>
+        <span className="text-zinc-400">Yeni cəm</span>
         <span className="text-2xl font-bold text-amber-400">{formatAzn(total)}</span>
         <p className="basis-full text-xs text-zinc-500">
-          Yekun məbləğ saxlanarkən serverdə yenidən hesablanır.
+          Yekun məbləğ yadda saxlanarkən serverdə yenidən hesablanır.
         </p>
       </div>
 
@@ -353,59 +364,24 @@ export default function OrderRevisionEditor({
         </p>
       )}
 
-      {!confirmSend ? (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button
-            type="submit"
-            name="intent"
-            value="save"
-            className="btn btn-secondary"
-            disabled={pending || !allValid}
-            aria-busy={pending}
-          >
-            {pending ? "Saxlanılır..." : "Dəyişiklikləri saxla"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={pending || !allValid || items.length === 0}
-            onClick={() => setConfirmSend(true)}
-          >
-            Müştəriyə göndər
-          </button>
-        </div>
-      ) : (
-        <div role="alertdialog" aria-label="Müştəriyə göndər" className="rounded-lg border border-amber-800/60 bg-amber-950/20 p-3">
-          <p className="text-sm font-medium text-white">
-            Dəyişikliklər müştəriyə göndərilsin?
-          </p>
-          <p className="mt-1 text-xs text-zinc-400">
-            Müştəri yeni cəmi ({formatAzn(total)}) görüb qəbul və ya rədd edəcək.
-            Qəbul edənə qədər sifariş və stok dəyişmir.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary flex-1"
-              disabled={pending}
-              onClick={() => setConfirmSend(false)}
-            >
-              İmtina
-            </button>
-            <button
-              ref={sendRef}
-              type="submit"
-              name="intent"
-              value="send"
-              className="btn btn-primary flex-1"
-              disabled={pending}
-              aria-busy={pending}
-            >
-              {pending ? "Göndərilir..." : "Bəli, göndər"}
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={pending || !changed}
+          onClick={() => setItems(fromLines(lines))}
+        >
+          Dəyişiklikləri geri al
+        </button>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={pending || !changed || !allValid || items.length === 0}
+          aria-busy={pending}
+        >
+          {pending ? "Yadda saxlanılır..." : "Dəyişiklikləri yadda saxla"}
+        </button>
+      </div>
     </form>
   );
 }

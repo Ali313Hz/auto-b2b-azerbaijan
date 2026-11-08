@@ -5,7 +5,7 @@ import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
-import { formatAzn, priceGroupLabels } from "@/lib/format";
+import { formatAzn } from "@/lib/format";
 
 import { changeCartQuantity, createOrder, removeFromCart } from "./actions";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CartPage() {
-  const { supabase, customer } = await requireCustomer();
+  const { supabase } = await requireCustomer();
 
   const { data: items, error } = await supabase.rpc("get_customer_cart");
 
@@ -73,7 +73,6 @@ export default async function CartPage() {
     <>
       <PageHeader
         title="Səbət"
-        description={`Qiymət qrupu: ${priceGroupLabels[customer.price_group]}`}
       />
 
       {hasProblems && (
@@ -110,6 +109,9 @@ export default async function CartPage() {
 
                 <div className="text-right">
                   <p className="text-xs text-zinc-500">
+                    {Number(item.unit_price) < Number(item.regular_price) && (
+                      <span className="mr-1 line-through">{formatAzn(item.regular_price)}</span>
+                    )}
                     {formatAzn(item.unit_price)} / əd.
                   </p>
 

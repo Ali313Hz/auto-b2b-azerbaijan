@@ -80,41 +80,15 @@ export async function updateOrderStatus(
   );
 }
 
-// Opens a draft change (or returns the open draft).
-export async function createOrderRevision(
-  _state: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
-  const orderId = readId(formData, "orderId");
-
-  if (!orderId) {
-    return fail("Sifariş məlumatı yanlışdır.");
-  }
-
-  const supabase = await getAuthedClient();
-
-  const { error } = await supabase.rpc("create_admin_order_revision", {
-    p_order_id: orderId,
-  });
-
-  if (error) {
-    return fail(dbErrorMessage(error, "Dəyişiklik yaradılmadı."));
-  }
-
-  revalidateOrder(orderId);
-
-  return ok("Dəyişiklik qaralaması açıldı.");
-}
-
-type DraftItem = {
+type EditItem = {
   product_id: string;
   quantity: number;
-  unit_price: number | null;
+  unit_price: string | null;
 };
 
 // Only ids, quantities and unit prices are sent; line totals and the order
 // total are calculated in the database.
-function parseItems(value: FormDataEntryValue | null): DraftItem[] | null {
+function parseItems(value: FormDataEntryValue | null): EditItem[] | null {
   if (typeof value !== "string" || value.length > 50_000) {
     return null;
   }
@@ -131,13 +105,12 @@ function parseItems(value: FormDataEntryValue | null): DraftItem[] | null {
     return null;
   }
 
-  const items: DraftItem[] = [];
+  const items: EditItem[] = [];
 
   for (const raw of parsed) {
     const item = raw as Record<string, unknown>;
     const quantity = Number(item?.quantity);
     const priceText = String(item?.unit_price ?? "").replace(",", ".").trim();
-    const price = priceText === "" ? null : Number(priceText);
 
     if (
       typeof item?.product_id !== "string" ||
@@ -145,127 +118,62 @@ function parseItems(value: FormDataEntryValue | null): DraftItem[] | null {
       !Number.isInteger(quantity) ||
       quantity < 1 ||
       quantity > 100_000 ||
-      (price !== null && (!Number.isFinite(price) || price < 0 || price > 1_000_000))
+      (priceText !== "" && !/^\d{1,9}(\.\d{1,2})?$/.test(priceText))
     ) {
       return null;
     }
 
-    items.push({ product_id: item.product_id, quantity, unit_price: price });
+    items.push({ product_id: item.product_id, quantity, unit_price: priceText || null });
   }
 
   return items;
 }
 
-// "Dəyişiklikləri saxla" (intent=save) or "Müştəriyə göndər" (intent=send:
-// save, then send).
-export async function saveOrderRevision(
+// "Dəyişiklikləri yadda saxla" on a PENDING order (OWNER, SALES).
+export async function saveOrderItems(
   _state: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
   const orderId = readId(formData, "orderId");
-  const revisionId = readId(formData, "revisionId");
-  const intent = formData.get("intent");
-  const noteValue = formData.get("note");
-  const note = typeof noteValue === "string" ? noteValue.trim().slice(0, 2000) : "";
+  const expected = formData.get("expectedUpdatedAt");
   const items = parseItems(formData.get("items"));
 
-  if (!orderId || !revisionId || (intent !== "save" && intent !== "send")) {
+  if (!orderId) {
     return fail("Sifariş məlumatı yanlışdır.");
   }
 
   if (!items) {
     return fail(
-      "Miqdar 1 ilə 100 000 arasında tam ədəd, qiymət isə 0 və ya daha böyük olmalıdır."
+      "Miqdar 1 ilə 100 000 arasında tam ədəd, qiymət isə 0 və ya daha böyük olmalıdır (ən çox 2 onluq)."
     );
   }
 
-  if (intent === "send" && items.length === 0) {
+  if (items.length === 0) {
     return fail("Sifarişdə ən azı bir məhsul olmalıdır.");
   }
 
   const supabase = await getAuthedClient();
 
-  const { error } = await supabase.rpc("save_admin_order_revision", {
-    p_revision_id: revisionId,
+  const { data: changes, error } = await supabase.rpc("update_admin_order_items", {
+    p_order_id: orderId,
     p_items: items,
-    p_note: note || null,
+    p_expected_updated_at:
+      typeof expected === "string" && expected.length <= 40 ? expected : null,
   });
 
   if (error) {
-    return fail(dbErrorMessage(error, "Dəyişikliklər saxlanmadı."));
-  }
-
-  if (intent === "send") {
-    const { error: sendError } = await supabase.rpc("send_admin_order_revision", {
-      p_revision_id: revisionId,
-    });
-
-    revalidateOrder(orderId);
-
-    if (sendError) {
-      return fail(
-        dbErrorMessage(sendError, "Dəyişikliklər saxlandı, lakin müştəriyə göndərilmədi.")
-      );
-    }
-
-    return ok("Dəyişikliklər müştəriyə göndərildi.");
+    return fail(dbErrorMessage(error, "Dəyişikliklər yadda saxlanmadı."));
   }
 
   revalidateOrder(orderId);
+  revalidatePath("/admin/products");
+  revalidatePath("/products");
 
-  return ok("Dəyişikliklər saxlandı. Müştəri hələ görmür.");
-}
-
-export async function resendOrderRevision(
-  _state: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
-  const orderId = readId(formData, "orderId");
-  const revisionId = readId(formData, "revisionId");
-
-  if (!orderId || !revisionId) {
-    return fail("Sifariş məlumatı yanlışdır.");
-  }
-
-  const supabase = await getAuthedClient();
-
-  const { error } = await supabase.rpc("resend_admin_order_revision", {
-    p_revision_id: revisionId,
-  });
-
-  if (error) {
-    return fail(dbErrorMessage(error, "Yenidən göndərilmədi."));
-  }
-
-  revalidateOrder(orderId);
-
-  return ok("Dəyişiklik müştəriyə yenidən göstərildi.");
-}
-
-export async function discardOrderRevision(
-  _state: ActionResult,
-  formData: FormData
-): Promise<ActionResult> {
-  const orderId = readId(formData, "orderId");
-  const revisionId = readId(formData, "revisionId");
-
-  if (!orderId || !revisionId) {
-    return fail("Sifariş məlumatı yanlışdır.");
-  }
-
-  const supabase = await getAuthedClient();
-
-  const { error } = await supabase.rpc("discard_admin_order_revision", {
-    p_revision_id: revisionId,
-  });
-
-  if (error) {
-    return fail(dbErrorMessage(error, "Dəyişiklik geri çağırılmadı."));
-  }
-
-  revalidateOrder(orderId);
-
-  return ok("Dəyişiklik geri çağırıldı. Sifariş əvvəlki kimi qalır.");
+  return ok(
+    changes
+      ? "Sifariş yeniləndi. Müştəri dəyişiklikləri öz səhifəsində görəcək."
+      : "Dəyişiklik yox idi, sifariş olduğu kimi qaldı."
+  );
 }
 
 export type OrderProductOption = {

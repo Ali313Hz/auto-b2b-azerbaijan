@@ -28,6 +28,7 @@ export default async function ProductsPage({
   const sort =
     typeof params.sort === "string" && SORTS.includes(params.sort) ? params.sort : "name";
   const page = readPage(params.page);
+  const saleOnly = params.sale === "1";
 
   const { supabase } = await requireCustomer();
 
@@ -40,6 +41,7 @@ export default async function ProductsPage({
       p_category_slug: selectedCategory || null,
       p_search: query || null,
       p_sort: sort,
+      p_on_sale: saleOnly,
     }),
     supabase.rpc("get_customer_categories"),
   ]);
@@ -58,7 +60,7 @@ export default async function ProductsPage({
   const visibleProducts = products ?? [];
   const total = visibleProducts[0]?.total_count ?? 0;
   const allCategories = categories ?? [];
-  const hasFilters = Boolean(selectedCategory || query);
+  const hasFilters = Boolean(selectedCategory || query || saleOnly);
 
   // Category navigation: main categories, then the children of the selected
   // branch (selected category, its parent or its grandparent).
@@ -76,7 +78,11 @@ export default async function ProductsPage({
     ...trail.map((node) => allCategories.filter((category) => category.parent_id === node.id)),
   ].filter((level) => level.length > 0);
 
-  const linkParams = { q: query, sort: sort === "name" ? undefined : sort };
+  const linkParams = {
+    q: query,
+    sort: sort === "name" ? undefined : sort,
+    sale: saleOnly ? "1" : undefined,
+  };
   const categoryHref = (slug: string) =>
     pageHref("/products", { ...linkParams, category: slug || undefined }, 1);
 
@@ -88,8 +94,25 @@ export default async function ProductsPage({
   return (
     <>
       <PageHeader
-        title="Kataloq"
-        description="Qiymətlər sizin qiymət qrupunuza uyğun göstərilir."
+        title={saleOnly ? "Endirimdə olan məhsullar" : "Kataloq"}
+        description={saleOnly ? "Yalnız hazırda endirimdə olan məhsullar." : undefined}
+        actions={
+          saleOnly ? (
+            <Link
+              href={pageHref("/products", { ...linkParams, sale: undefined, category: selectedCategory || undefined }, 1)}
+              className="btn btn-secondary"
+            >
+              Bütün məhsullar
+            </Link>
+          ) : (
+            <Link
+              href={pageHref("/products", { ...linkParams, sale: "1", category: selectedCategory || undefined }, 1)}
+              className="btn bg-red-600 font-semibold text-white hover:bg-red-500"
+            >
+              % Endirimdə olanlar
+            </Link>
+          )
+        }
       />
 
       <div className="mb-6 flex flex-col gap-4">
@@ -131,14 +154,21 @@ export default async function ProductsPage({
         {hasFilters && (
           <p className="text-sm text-zinc-400">
             {total} məhsul tapıldı
-            {selected ? ` · ${trail.map((node) => node.name).join(" / ")}` : ""}
+            {saleOnly ? " · endirimdə" : ""}
+            {selected ? ` · ${trail.map((node) => node.name).join(" › ")}` : ""}
           </p>
         )}
       </div>
 
       {visibleProducts.length === 0 ? (
         <EmptyState
-          title={hasFilters ? "Uyğun məhsul tapılmadı" : "Hazırda satışda məhsul yoxdur"}
+          title={
+            saleOnly && !selectedCategory && !query
+              ? "Hazırda endirimdə məhsul yoxdur"
+              : hasFilters
+                ? "Uyğun məhsul tapılmadı"
+                : "Hazırda satışda məhsul yoxdur"
+          }
           description={
             hasFilters
               ? "Başqa kateqoriya seçin və ya axtarış sözünü dəyişin."
@@ -166,8 +196,13 @@ export default async function ProductsPage({
               >
                 <Link
                   href={`/products/${product.id}`}
-                  className="group block aspect-[4/3] bg-zinc-950"
+                  className="group relative block aspect-[4/3] bg-zinc-950"
                 >
+                  {product.on_sale && (
+                    <span className="absolute top-2 left-2 z-10 rounded bg-red-600 px-2 py-0.5 text-xs font-bold tracking-wide text-white">
+                      ENDİRİM
+                    </span>
+                  )}
                   {imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -213,9 +248,7 @@ export default async function ProductsPage({
                     </p>
                   </div>
 
-                  <p className="mt-auto text-xl font-bold text-amber-400">
-                    {formatAzn(product.price)}
-                  </p>
+                  <PriceTag price={product.price} regular={product.regular_price} onSale={product.on_sale} />
 
                   <AddToCartForm
                     productId={product.id}
@@ -236,5 +269,24 @@ export default async function ProductsPage({
         params={{ ...linkParams, category: selectedCategory || undefined }}
       />
     </>
+  );
+}
+
+function PriceTag({
+  price,
+  regular,
+  onSale,
+}: {
+  price: number;
+  regular: number;
+  onSale: boolean;
+}) {
+  return onSale ? (
+    <p className="mt-auto flex flex-wrap items-baseline gap-x-2">
+      <span className="text-sm text-zinc-500 line-through">{formatAzn(regular)}</span>
+      <span className="text-xl font-bold text-red-400">{formatAzn(price)}</span>
+    </p>
+  ) : (
+    <p className="mt-auto text-xl font-bold text-amber-400">{formatAzn(price)}</p>
   );
 }

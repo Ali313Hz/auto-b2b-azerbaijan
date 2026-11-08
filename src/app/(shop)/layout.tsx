@@ -2,9 +2,8 @@ import Link from "next/link";
 
 import NavLink from "@/components/NavLink";
 import SubmitButton from "@/components/SubmitButton";
-import { Badge, Logo } from "@/components/ui";
+import { Logo } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
-import { priceGroupLabels } from "@/lib/format";
 
 import { logout } from "./account/actions";
 
@@ -13,11 +12,7 @@ export default async function ShopLayout({
 }: LayoutProps<"/">) {
   const { supabase, customer } = await requireCustomer();
 
-  const [{ data: cartItems }, { data: alerts }] = await Promise.all([
-    supabase.rpc("get_customer_cart"),
-    supabase.rpc("get_customer_order_alerts"),
-  ]);
-  const firstAlert = alerts?.[0];
+  const { data: cartItems } = await supabase.rpc("get_customer_cart");
 
   const cartCount = (cartItems ?? []).reduce(
     (sum, item) => sum + item.quantity,
@@ -34,6 +29,12 @@ export default async function ShopLayout({
 
           <nav className="order-3 -mx-1 flex w-full gap-1 overflow-x-auto md:order-none md:mx-0 md:w-auto md:flex-1">
             <NavLink href="/products">Kataloq</NavLink>
+            <Link
+              href="/products?sale=1"
+              className="rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap text-red-400 hover:bg-zinc-900 hover:text-red-300"
+            >
+              Endirimdə olanlar
+            </Link>
             <NavLink href="/orders">Sifarişlər</NavLink>
             <NavLink href="/account">Hesab</NavLink>
           </nav>
@@ -43,9 +44,6 @@ export default async function ShopLayout({
               <p className="max-w-48 truncate text-sm font-medium text-zinc-200">
                 {customer.company_name ?? "Müştəri"}
               </p>
-              <Badge tone="blue">
-                {priceGroupLabels[customer.price_group]}
-              </Badge>
             </div>
 
             <Link
@@ -71,24 +69,6 @@ export default async function ShopLayout({
           </div>
         </div>
       </header>
-
-      {firstAlert && (
-        <div role="status" className="border-b border-amber-700/60 bg-amber-950/40">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm sm:px-6">
-            <span className="font-medium text-amber-200">
-              {alerts.length > 1
-                ? `${alerts.length} sifarişinizdə dəyişiklik edilib. Cavabınızı gözləyirik.`
-                : "Sifarişinizdə dəyişiklik edilib. Cavabınızı gözləyirik."}
-            </span>
-            <Link
-              href={alerts.length > 1 ? "/orders" : `/orders/${firstAlert.order_id}`}
-              className="btn btn-sm btn-primary"
-            >
-              Bax və cavab ver
-            </Link>
-          </div>
-        </div>
-      )}
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
         {children}

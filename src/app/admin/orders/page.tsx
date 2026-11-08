@@ -8,9 +8,6 @@ import {
   formatDate,
   orderStatusLabels,
   orderStatusTones,
-  priceGroupLabels,
-  revisionStatusLabels,
-  revisionStatusTones,
   shortId,
 } from "@/lib/format";
 
@@ -34,13 +31,7 @@ export default async function AdminOrdersPage({
 
   const { supabase } = await requireStaff("ordersView");
 
-  const [{ data: orders, error }, { data: revisionStates }] = await Promise.all([
-    supabase.rpc("get_admin_orders"),
-    supabase.rpc("get_admin_order_revision_states"),
-  ]);
-  const revisionByOrder = new Map(
-    (revisionStates ?? []).map((state) => [state.order_id, state])
-  );
+  const { data: orders, error } = await supabase.rpc("get_admin_orders");
 
   if (error) {
     return (
@@ -99,8 +90,6 @@ export default async function AdminOrdersPage({
           {/* Phones: cards instead of a wide table. */}
           <ul className="space-y-3 md:hidden">
             {visibleOrders.map((order) => {
-              const revision = revisionByOrder.get(order.order_id);
-
               return (
                 <li key={order.order_id}>
                   <Link
@@ -113,7 +102,7 @@ export default async function AdminOrdersPage({
                           #{shortId(order.order_id)}
                         </p>
                         <p className="truncate text-sm text-zinc-300">
-                          {order.company_name ?? "—"} · {priceGroupLabels[order.price_group]}
+                          {order.company_name ?? "—"}
                         </p>
                         <p className="text-xs text-zinc-500">{formatDate(order.created_at)}</p>
                       </div>
@@ -125,11 +114,6 @@ export default async function AdminOrdersPage({
                       <Badge tone={orderStatusTones[order.status]}>
                         {orderStatusLabels[order.status]}
                       </Badge>
-                      {revision && (
-                        <Badge tone={revisionStatusTones[revision.status]}>
-                          V{revision.version}: {revisionStatusLabels[revision.status]}
-                        </Badge>
-                      )}
                       <span className="text-xs text-zinc-500">{order.item_count} məhsul</span>
                     </div>
                   </Link>
@@ -152,8 +136,6 @@ export default async function AdminOrdersPage({
 
               <tbody>
                 {visibleOrders.map((order) => {
-                  const revision = revisionByOrder.get(order.order_id);
-
                   return (
                     <tr key={order.order_id} className="hover:bg-zinc-900/60">
                       <td className="whitespace-nowrap">
@@ -172,7 +154,7 @@ export default async function AdminOrdersPage({
                           {order.company_name ?? "—"}
                         </span>
                         <span className="text-xs text-zinc-500">
-                          {priceGroupLabels[order.price_group]} · {order.item_count} məhsul
+                          {order.item_count} məhsul
                         </span>
                       </td>
                       <td>
@@ -180,11 +162,6 @@ export default async function AdminOrdersPage({
                           <Badge tone={orderStatusTones[order.status]}>
                             {orderStatusLabels[order.status]}
                           </Badge>
-                          {revision && (
-                            <Badge tone={revisionStatusTones[revision.status]}>
-                              V{revision.version}: {revisionStatusLabels[revision.status]}
-                            </Badge>
-                          )}
                         </div>
                       </td>
                       <td className="text-right font-semibold whitespace-nowrap text-white">

@@ -93,6 +93,7 @@ export default async function ProductDetailPage({
 
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
+            {product.on_sale && <Badge tone="red">ENDİRİM</Badge>}
             {product.category_name && <Badge>{product.category_name}</Badge>}
 
             {product.stock > 0 ? (
@@ -111,11 +112,21 @@ export default async function ProductDetailPage({
           </p>
 
           <div className="card mt-6 p-5">
-            <p className="text-sm text-zinc-400">Sizin qiymətiniz</p>
+            <p className="text-sm text-zinc-400">Qiymət</p>
 
-            <p className="mt-1 text-3xl font-bold text-amber-400">
-              {formatAzn(product.price)}
-            </p>
+            {product.on_sale ? (
+              <p className="mt-1 flex flex-wrap items-baseline gap-x-3">
+                <span className="text-lg text-zinc-500 line-through">
+                  {formatAzn(product.regular_price)}
+                </span>
+                <span className="text-3xl font-bold text-red-400">{formatAzn(product.price)}</span>
+                <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">ENDİRİM</span>
+              </p>
+            ) : (
+              <p className="mt-1 text-3xl font-bold text-amber-400">
+                {formatAzn(product.price)}
+              </p>
+            )}
 
             <div className="mt-4">
               <AddToCartForm productId={product.id} stock={product.stock} />
