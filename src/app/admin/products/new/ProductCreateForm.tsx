@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 
-import { formatAzn } from "@/lib/format";
+import { categoryOptionLabel, formatAzn } from "@/lib/format";
 
 import { createProductDraft, updateProductActive } from "../actions";
 import MediaDropZone from "../MediaDropZone";
@@ -338,7 +338,7 @@ export default function ProductCreateForm({
               </option>
               {categories.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {`${"   ".repeat(item.depth)}${item.depth > 0 ? "└ " : ""}${item.name}`}
+                  {categoryOptionLabel(item)}
                   {item.available ? "" : " (deaktiv)"}
                 </option>
               ))}

@@ -6,7 +6,7 @@ import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, Field, PageHeader } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
-import { uuidPattern } from "@/lib/format";
+import { categoryOptionLabel, uuidPattern } from "@/lib/format";
 import { can } from "@/lib/roles";
 import { signMediaPaths } from "@/lib/media";
 
@@ -210,7 +210,7 @@ export default async function AdminProductDetailPage({
                 </option>
                 {(categories ?? []).map((category) => (
                   <option key={category.id} value={category.id}>
-                    {`${"   ".repeat(category.depth)}${category.depth > 0 ? "└ " : ""}${category.name}`}
+                    {categoryOptionLabel(category)}
                     {category.available ? "" : " (deaktiv)"}
                   </option>
                 ))}

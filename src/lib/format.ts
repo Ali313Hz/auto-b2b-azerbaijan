@@ -118,3 +118,11 @@ export const staffRoleLabels: Record<StaffRole, string> = {
   SUPPORT: "Dəstək",
   WAREHOUSE: "Anbar",
 };
+
+// Category name indented by depth for <select> lists (options cannot hold
+// markup, so non-breaking spaces keep the indentation).
+export function categoryOptionLabel(category: { depth: number; name: string }) {
+  const indent = String.fromCharCode(160).repeat(category.depth * 3);
+
+  return category.depth > 0 ? `${indent}└ ${category.name}` : category.name;
+}

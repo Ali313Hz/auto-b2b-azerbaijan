@@ -365,7 +365,7 @@ export default async function AdminCustomerDetailPage({
           <p className="card p-4 text-sm text-zinc-500">Sifariş yoxdur.</p>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table min-w-0">
               <thead>
                 <tr>
                   <th>Sifariş</th>

@@ -5,7 +5,7 @@ import Pagination from "@/components/Pagination";
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { can } from "@/lib/roles";
-import { formatAzn, readPage, uuidPattern } from "@/lib/format";
+import { categoryOptionLabel, formatAzn, readPage, uuidPattern } from "@/lib/format";
 
 const PAGE_SIZE = 50;
 
@@ -108,7 +108,7 @@ export default async function AdminProductsPage({
             <option value="">Hamısı</option>
             {(categories ?? []).map((category) => (
               <option key={category.id} value={category.id}>
-                {category.path}
+                {categoryOptionLabel(category)}
               </option>
             ))}
           </select>
@@ -159,88 +159,117 @@ export default async function AdminProductsPage({
           }
         />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Məhsul</th>
-                <th>Kateqoriya</th>
-                <th className="text-right">Stok</th>
-                {canEdit && (
-                  <>
-                    <th className="text-right">Normal</th>
-                    <th className="text-right">Diler</th>
-                    <th className="text-right">VIP</th>
-                  </>
-                )}
-                <th>Status</th>
-                <th className="sr-only">Əməliyyat</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {visibleProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-zinc-900/60">
-                  <td className="max-w-xs">
-                    <Link
-                      href={`/admin/products/${product.id}`}
-                      className="block truncate font-medium text-white hover:text-amber-400"
-                    >
-                      {product.name}
-                    </Link>
-                    <span className="font-mono text-xs text-zinc-500">
-                      {product.sku}
-                    </span>
-                  </td>
-                  <td className="text-zinc-400">
-                    {product.category_name ?? "—"}
-                  </td>
-                  <td className="text-right">
-                    <span
-                      className={
-                        product.stock === 0
-                          ? "font-semibold text-red-400"
-                          : product.stock <= 5
-                            ? "font-semibold text-amber-400"
-                            : "text-zinc-200"
-                      }
-                    >
-                      {product.stock}
-                    </span>
-                  </td>
-                  {canEdit && (
-                    <>
-                      <td className="text-right whitespace-nowrap">
-                        {formatAzn(product.normal_price)}
-                      </td>
-                      <td className="text-right whitespace-nowrap">
-                        {formatAzn(product.dealer_price)}
-                      </td>
-                      <td className="text-right whitespace-nowrap">
-                        {formatAzn(product.vip_price)}
-                      </td>
-                    </>
-                  )}
-                  <td>
+        <>
+          {/* Mobile: one card per product. */}
+          <ul className="space-y-3 md:hidden">
+            {visibleProducts.map((product) => (
+              <li key={product.id}>
+                <Link
+                  href={`/admin/products/${product.id}`}
+                  className="card block space-y-2 p-4 hover:border-zinc-700"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium break-words text-white">{product.name}</p>
+                      <p className="font-mono text-xs text-zinc-500">{product.sku}</p>
+                    </div>
                     {product.active ? (
                       <Badge tone="green">Aktiv</Badge>
                     ) : (
                       <Badge tone="red">Deaktiv</Badge>
                     )}
-                  </td>
-                  <td className="text-right">
-                    <Link
-                      href={`/admin/products/${product.id}`}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      {canEdit ? "Redaktə" : "Stok"}
-                    </Link>
-                  </td>
+                  </div>
+                  <p className="text-sm text-zinc-400">{product.category_name ?? "—"}</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                    <span>
+                      <span className="text-zinc-500">Stok: </span>
+                      <StockValue stock={product.stock} />
+                    </span>
+                    {canEdit && (
+                      <>
+                        <span className="text-zinc-300">
+                          <span className="text-zinc-500">N: </span>
+                          {formatAzn(product.normal_price)}
+                        </span>
+                        <span className="text-zinc-300">
+                          <span className="text-zinc-500">D: </span>
+                          {formatAzn(product.dealer_price)}
+                        </span>
+                        <span className="text-zinc-300">
+                          <span className="text-zinc-500">VIP: </span>
+                          {formatAzn(product.vip_price)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop: compact table that fits without sideways scrolling. */}
+          <div className="table-wrap hidden md:block">
+            <table className="table min-w-0 table-fixed">
+              <thead>
+                <tr>
+                  <th className={canEdit ? "w-[34%]" : "w-[45%]"}>Məhsul</th>
+                  <th>Kateqoriya</th>
+                  <th className="w-20 text-right">Stok</th>
+                  {canEdit && <th className="w-36 text-right">Qiymətlər</th>}
+                  <th className="w-24">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+                {visibleProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-zinc-900/60">
+                    <td>
+                      <Link
+                        href={`/admin/products/${product.id}`}
+                        className="block truncate font-medium text-white hover:text-amber-400"
+                        title={product.name}
+                      >
+                        {product.name}
+                      </Link>
+                      <span className="block truncate font-mono text-xs text-zinc-500">
+                        {product.sku}
+                      </span>
+                    </td>
+                    <td className="truncate text-zinc-400" title={product.category_name ?? undefined}>
+                      {product.category_name ?? "—"}
+                    </td>
+                    <td className="text-right">
+                      <StockValue stock={product.stock} />
+                    </td>
+                    {canEdit && (
+                      <td className="text-right text-xs leading-5 whitespace-nowrap">
+                        <span className="block text-zinc-200">
+                          <span className="text-zinc-500">N </span>
+                          {formatAzn(product.normal_price)}
+                        </span>
+                        <span className="block text-zinc-300">
+                          <span className="text-zinc-500">D </span>
+                          {formatAzn(product.dealer_price)}
+                        </span>
+                        <span className="block text-amber-300">
+                          <span className="text-zinc-500">VIP </span>
+                          {formatAzn(product.vip_price)}
+                        </span>
+                      </td>
+                    )}
+                    <td>
+                      {product.active ? (
+                        <Badge tone="green">Aktiv</Badge>
+                      ) : (
+                        <Badge tone="red">Deaktiv</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <Pagination
@@ -256,5 +285,21 @@ export default async function AdminProductsPage({
         }}
       />
     </>
+  );
+}
+
+function StockValue({ stock }: { stock: number }) {
+  return (
+    <span
+      className={
+        stock === 0
+          ? "font-semibold text-red-400"
+          : stock <= 5
+            ? "font-semibold text-amber-400"
+            : "text-zinc-200"
+      }
+    >
+      {stock}
+    </span>
   );
 }
