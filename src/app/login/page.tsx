@@ -48,8 +48,7 @@ export default async function LoginPage({
         </div>
 
         <p className="mt-6 text-center text-xs text-zinc-600">
-          Hesab yalnız administrator tərəfindən yaradılır. Girişdən sonra
-          autentifikator tətbiqindən 6 rəqəmli kod tələb olunur.
+          Hesab yalnız administrator tərəfindən yaradılır.
         </p>
       </div>
     </main>
