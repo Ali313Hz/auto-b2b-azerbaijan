@@ -225,8 +225,21 @@ try {
   const tryQ = async (sql) => { try { await c.query(sql); return null; } catch (e) { return e.message; } };
   ok("self parent rejected", !!(await tryQ(`update public.categories set parent_id = id where id = '${A}'`)));
   ok("cycle rejected", /cycle/.test(await tryQ(`update public.categories set parent_id = '${C}' where id = '${A}'`) ?? ""));
-  ok("depth > 3 rejected", /too deep/.test(await tryQ(`insert into public.categories (name, slug, parent_id) values ('E','e','${C}')`) ?? ""));
-  ok("subtree move too deep rejected", /too deep/.test(await tryQ(`update public.categories set parent_id = '${D}' where id = '${B}'`) ?? ""));
+  // Up to 10 levels (A > B > C is 3 deep): deeper is rejected, also for a
+  // subtree move. Each check runs in a rolled-back transaction.
+  const inTx = async (sql) => {
+    await c.query("begin");
+    try { await c.query(sql); return null; } catch (e) { return e.message; } finally { await c.query("rollback"); }
+  };
+  const chain = (parent, from, to) => `do $$ declare v uuid := '${parent}'; begin
+    for i in ${from}..${to} loop
+      insert into public.categories (name, slug, parent_id) values ('L' || i, 'deep-' || i, v) returning id into v;
+    end loop; end $$`;
+  ok("4th level allowed", (await inTx(chain(C, 4, 4))) === null);
+  ok("10 levels allowed", (await inTx(chain(C, 4, 10))) === null);
+  ok("11th level rejected", /too deep/.test((await inTx(chain(C, 4, 11))) ?? ""));
+  ok("subtree move too deep rejected", /too deep/.test((await inTx(`${chain(R2, 2, 9)}; update public.categories set parent_id = (select id from public.categories where slug = 'deep-9') where id = '${B}'`)) ?? ""));
+  ok("subtree move within limit allowed", (await inTx(`update public.categories set parent_id = '${D}' where id = '${B}'`)) === null);
   r = await as(U.owner, `select public.update_admin_category('${A}', 'A', 'a', 0, true, '${C}')`);
   ok("RPC move into own descendant rejected", /cycle/.test(r.error ?? ""), JSON.stringify(r));
   r = await as(U.owner, "select public.create_admin_category('Bad', 'Bad Slug!', 0, true, null)");

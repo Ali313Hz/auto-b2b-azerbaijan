@@ -2,7 +2,7 @@
 
 Run the migrations on a local, throw-away Postgres 17 (embedded-postgres)
 with a small Supabase stub (roles, `auth.uid()`, sessions, storage), then
-check permissions, sessions, passwords state, roles and order revisions.
+check permissions, sessions, passwords state, roles, pricing, categories and order editing.
 No Supabase project, keys or network access are used.
 
 ```bash

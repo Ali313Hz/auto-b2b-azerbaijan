@@ -68,6 +68,8 @@ try {
 
   const O = "OWNER", S = "SALES", P = "PRODUCT_MANAGER", W = "WAREHOUSE", H = "SUPPORT";
   // [name, sql, allowed roles]
+  // Same items again = no change (the role check still runs first).
+  const sameItems = JSON.stringify((await c.query("select product_id, quantity from public.order_items where order_id = $1", [orderId])).rows);
   const calls = [
     ["dashboard", "select * from public.get_admin_dashboard_stats()", [O, S, P, W, H]],
     ["customers list", "select * from public.get_admin_customers()", [O, S, H]],
@@ -82,6 +84,11 @@ try {
     ["orders list", "select * from public.get_admin_orders()", [O, S, W, H]],
     ["order items", `select * from public.get_admin_order_items('${orderId}')`, [O, S, W, H]],
     ["order status", `select public.update_admin_order_status('${orderId}', 'CONFIRMED')`, [O, S, W]],
+    ["order edit items", `select public.update_admin_order_items('${orderId}', '${sameItems}'::jsonb)`, [O, S]],
+    ["order change history", `select * from public.get_admin_order_changes('${orderId}')`, [O, S, W, H]],
+    ["order product search", `select * from public.search_admin_order_products('${orderId}', 'a')`, [O, S]],
+    ["old revision create (off)", `select public.create_admin_order_revision('${orderId}')`, []],
+    ["old revision answer (off)", `select public.respond_to_order_revision('${orderId}', true)`, []],
     ["products page", "select * from public.get_admin_products_page()", [O, P, W]],
     ["product", `select * from public.get_admin_product('${pid}')`, [O, P, W]],
     ["product media list", `select * from public.get_admin_product_media('${pid}')`, [O, P, W]],
@@ -91,6 +98,8 @@ try {
     ["product active", `select public.update_admin_product_active('${pid}', false)`, [O, P]],
     ["product content", `select public.update_admin_product_content('${pid}', 'N', 'D', null)`, [O, P]],
     ["product create", "select public.create_admin_product('NEW-1', null, 1, 1, 1, 1, true)", [O, P]],
+    ["product create (optional prices)", "select public.create_admin_product('NEW-2', null, 1, 10, null, null, 8, true)", [O, P]],
+    ["product pricing", `select public.update_admin_product_pricing('${pid}', 7, 10, null, null, 9)`, [O, P]],
     ["media create", `select public.create_admin_product_media('${pid}', 'IMAGE', '${pid}/b.jpg', 'b.jpg', 'image/jpeg')`, [O, P]],
     ["media primary", `select public.set_admin_product_primary_media('${media}')`, [O, P]],
     ["media delete", `select public.delete_admin_product_media('${media}')`, [O, P]],
@@ -123,8 +132,11 @@ try {
     const page = await as(w, "select * from public.get_admin_products_page()");
     const one = await as(w, `select * from public.get_admin_product('${pid}')`);
     const has = (rows) => rows.every((x) => x.normal_price !== null && x.dealer_price !== null && x.vip_price !== null);
-    const none = (rows) => rows.every((x) => x.normal_price === null && x.dealer_price === null && x.vip_price === null);
-    ok(`prices ${visible ? "visible" : "hidden"} for ${w}`, page.rows?.length > 0 && one.rows?.length === 1 && (visible ? has(page.rows) && has(one.rows) : none(page.rows) && none(one.rows)));
+    const none = (rows) => rows.every((x) => x.normal_price === null && x.dealer_price === null && x.vip_price === null && x.sale_price === null);
+    const pageHas = (rows) => rows.every((x) => x.normal_price !== null && x.has_group_prices !== null);
+    const pageNone = (rows) => rows.every((x) => x.normal_price === null && x.sale_price === null && x.has_group_prices === null);
+    ok(`prices ${visible ? "visible" : "hidden"} for ${w}`, page.rows?.length > 0 && one.rows?.length === 1 && (visible ? pageHas(page.rows) && has(one.rows) : pageNone(page.rows) && none(one.rows)));
+    ok(`product list has no dealer/VIP columns (${w})`, page.rows?.every((x) => !("dealer_price" in x) && !("vip_price" in x)));
   }
   // Media readable by any active staff, not by temp-password staff.
   for (const [w, n] of [[S, 1], [H, 1], [W, 1], ["TEMP_SALES", 0], ["INACTIVE_PM", 0]]) {
