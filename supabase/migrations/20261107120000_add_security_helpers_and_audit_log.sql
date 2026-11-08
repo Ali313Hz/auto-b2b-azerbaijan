@@ -21,9 +21,22 @@ as $$
 $$;
 
 
--- OWNER access requires: authenticated user, active staff profile,
--- OWNER role and an aal2 (MFA) session. Any doubt means false.
-create or replace function private.is_active_owner()
+-- MFA is optional for now. To make it mandatory for everyone later,
+-- redefine this function to return true in a new migration.
+create or replace function private.mfa_required()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select false;
+$$;
+
+
+-- The session meets the MFA rule: an aal2 session, or (while MFA is
+-- optional) a user without a verified TOTP factor. A user who enrolled a
+-- factor must complete the TOTP challenge before any data access.
+create or replace function private.mfa_satisfied()
 returns boolean
 language sql
 stable
@@ -32,6 +45,29 @@ set search_path = ''
 as $$
   select
     private.has_aal2()
+    or (
+      not private.mfa_required()
+      and not exists (
+        select 1
+        from auth.mfa_factors as f
+        where f.user_id = (select auth.uid())
+          and f.status = 'verified'
+      )
+    );
+$$;
+
+
+-- OWNER access requires: authenticated user, active staff profile,
+-- OWNER role and a session that meets the MFA rule. Any doubt means false.
+create or replace function private.is_active_owner()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select
+    private.mfa_satisfied()
     and exists (
       select 1
       from public.staff_profiles as sp
@@ -43,7 +79,7 @@ $$;
 
 
 -- Price group of the calling customer, or null when the caller is not an
--- active, non-archived customer with an aal2 session.
+-- active, non-archived customer whose session meets the MFA rule.
 create or replace function private.active_customer_price_group()
 returns public.customer_price_group
 language sql
@@ -53,7 +89,7 @@ set search_path = ''
 as $$
   select cp.price_group
   from public.customer_profiles as cp
-  where private.has_aal2()
+  where private.mfa_satisfied()
     and cp.id = (select auth.uid())
     and cp.active = true
     and cp.archived_at is null;
@@ -62,6 +98,8 @@ $$;
 
 revoke all on all functions in schema private from public, anon;
 grant execute on function private.has_aal2() to authenticated, service_role;
+grant execute on function private.mfa_required() to authenticated, service_role;
+grant execute on function private.mfa_satisfied() to authenticated, service_role;
 grant execute on function private.is_active_owner() to authenticated, service_role;
 grant execute on function private.active_customer_price_group() to authenticated, service_role;
 
@@ -240,7 +278,7 @@ revoke execute on function public.record_admin_security_event(text, uuid) from p
 grant execute on function public.record_admin_security_event(text, uuid) to authenticated;
 
 
--- Lets server actions confirm the database-level OWNER + aal2 check before
+-- Lets server actions confirm the database-level OWNER check before
 -- they use the secret (service-role) key.
 create or replace function public.current_user_is_owner()
 returns boolean
