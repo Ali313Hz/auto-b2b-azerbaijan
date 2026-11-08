@@ -121,8 +121,10 @@ export const staffRoleLabels: Record<StaffRole, string> = {
 
 // Category name indented by depth for <select> lists (options cannot hold
 // markup, so non-breaking spaces keep the indentation).
+// get_admin_categories counts depth from 1 (top level = 1).
 export function categoryOptionLabel(category: { depth: number; name: string }) {
-  const indent = String.fromCharCode(160).repeat(category.depth * 3);
+  const level = Math.max(0, category.depth - 1);
+  const indent = String.fromCharCode(160).repeat(level * 3);
 
-  return category.depth > 0 ? `${indent}└ ${category.name}` : category.name;
+  return level > 0 ? `${indent}└ ${category.name}` : category.name;
 }
