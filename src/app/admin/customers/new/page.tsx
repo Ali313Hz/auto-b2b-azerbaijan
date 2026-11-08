@@ -27,7 +27,7 @@ export default async function NewCustomerPage() {
 
       <PageHeader
         title="Yeni müştəri"
-        description="Müştəri bu e-poçt və şifrə ilə daxil olacaq. Şifrəni müştəriyə təhlükəsiz kanalla çatdırın."
+        description="Müştəri bu e-poçt və müvəqqəti şifrə ilə daxil olub (24 saat ərzində) öz şifrəsini təyin edəcək. Şifrəni təhlükəsiz kanalla çatdırın."
       />
 
       <ActionForm

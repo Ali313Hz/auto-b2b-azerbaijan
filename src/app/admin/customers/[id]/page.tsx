@@ -3,12 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import ActionForm from "@/components/ActionForm";
+import PasswordResetForm from "@/components/PasswordResetForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, Field, PageHeader } from "@/components/ui";
 import { requireOwner } from "@/lib/auth";
 import {
   formatAzn,
   formatDate,
+  isPast,
   orderStatusLabels,
   orderStatusTones,
   priceGroupLabels,
@@ -20,8 +22,9 @@ import {
   archiveCustomer,
   permanentlyDeleteCustomer,
   restoreCustomer,
+  resetCustomerPassword,
   updateCustomerActive,
-  updateCustomerLogin,
+  updateCustomerEmail,
   updateCustomerPriceGroup,
   updateCustomerProfile,
   resetCustomerMfa,
@@ -38,10 +41,12 @@ export default async function AdminCustomerDetailPage({
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const { supabase } = await requireOwner();
 
-  const [{ data: customers }, { data: orders }] = await Promise.all([
-    supabase.rpc("get_admin_customers"),
-    supabase.rpc("get_admin_orders"),
-  ]);
+  const [{ data: customers }, { data: orders }, { data: loginRows }] =
+    await Promise.all([
+      supabase.rpc("get_admin_customers"),
+      supabase.rpc("get_admin_orders"),
+      supabase.rpc("get_admin_customer_login", { p_customer_id: id }),
+    ]);
 
   const customer = customers?.find((item) => item.id === id);
 
@@ -53,6 +58,9 @@ export default async function AdminCustomerDetailPage({
     (order) => order.customer_id === id
   );
   const isArchived = customer.archived_at !== null;
+  const login = loginRows?.[0];
+  const tempExpired =
+    login?.must_change_password && isPast(login.temporary_password_expires_at);
 
   return (
     <>
@@ -64,7 +72,7 @@ export default async function AdminCustomerDetailPage({
       </Link>
 
       {query.notice === "created" && (
-        <Alert tone="green">Müştəri yaradıldı və daxil ola bilər.</Alert>
+        <Alert tone="green">Müştəri yaradıldı. İlk girişdə (24 saat ərzində) öz şifrəsini təyin edəcək.</Alert>
       )}
 
       <PageHeader
@@ -206,51 +214,90 @@ export default async function AdminCustomerDetailPage({
             )}
           </section>
 
-          {!isArchived && (
-            <section className="card p-5 sm:p-6">
-              <h2 className="font-semibold text-white">Giriş məlumatları</h2>
-              <p className="mt-1 mb-4 text-sm text-zinc-400">
-                Dəyişməyəcək sahəni boş saxlayın.
-              </p>
+          <section className="card p-5 sm:p-6">
+            <h2 className="font-semibold text-white">Giriş və şifrə</h2>
+            <p className="mt-1 mb-4 text-sm text-zinc-400">
+              Mövcud şifrəni heç kim görə bilməz. Müştəri şifrəsini
+              unudubsa, müvəqqəti şifrə təyin edin.
+            </p>
 
-              <ActionForm
-                action={updateCustomerLogin}
-                resetOnSuccess
-                className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-              >
-                <input type="hidden" name="customerId" value={customer.id} />
+            <dl className="mb-4 divide-y divide-zinc-800 text-sm">
+              <div className="flex flex-wrap justify-between gap-2 py-2">
+                <dt className="text-zinc-400">E-poçt</dt>
+                <dd className="text-zinc-100">{login?.email ?? customer.email ?? "—"}</dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2 py-2">
+                <dt className="text-zinc-400">Status</dt>
+                <dd>
+                  {isArchived ? (
+                    <Badge tone="amber">Arxivdə</Badge>
+                  ) : customer.active ? (
+                    <Badge tone="green">Aktiv</Badge>
+                  ) : (
+                    <Badge tone="red">Deaktiv</Badge>
+                  )}
+                </dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2 py-2">
+                <dt className="text-zinc-400">Şifrə</dt>
+                <dd>
+                  {!login?.must_change_password ? (
+                    <span className="text-zinc-300">Müştəri tərəfindən təyin edilib</span>
+                  ) : tempExpired ? (
+                    <Badge tone="red">Müvəqqəti şifrənin vaxtı bitib</Badge>
+                  ) : (
+                    <Badge tone="amber">
+                      Müvəqqəti · {formatDate(login.temporary_password_expires_at!)} qədər
+                    </Badge>
+                  )}
+                </dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2 py-2">
+                <dt className="text-zinc-400">Son giriş</dt>
+                <dd className="text-zinc-300">
+                  {login?.last_sign_in_at ? formatDate(login.last_sign_in_at) : "—"}
+                </dd>
+              </div>
+            </dl>
 
-                <Field label="Yeni e-poçt" htmlFor="newEmail">
-                  <input
-                    id="newEmail"
-                    type="email"
-                    name="email"
-                    autoComplete="off"
-                    placeholder={customer.email ?? ""}
-                    className="input"
-                  />
-                </Field>
+            {!isArchived && (
+              <div className="space-y-5">
+                <PasswordResetForm
+                  action={resetCustomerPassword}
+                  idName="customerId"
+                  idValue={customer.id}
+                  confirmMessage="Müştərinin şifrəsi sıfırlansın? Açıq sessiyaları dərhal bağlanacaq."
+                />
 
-                <Field label="Yeni şifrə" htmlFor="newPassword" hint="Ən azı 12 simvol: böyük və kiçik hərf, rəqəm və simvol.">
-                  <input
-                    id="newPassword"
-                    type="password"
-                    name="password"
-                    minLength={12}
-                    maxLength={72}
-                    autoComplete="new-password"
-                    className="input"
-                  />
-                </Field>
+                <ActionForm
+                  action={updateCustomerEmail}
+                  resetOnSuccess
+                  className="flex flex-wrap items-end gap-3 border-t border-zinc-800 pt-4"
+                >
+                  <input type="hidden" name="customerId" value={customer.id} />
 
-                <div className="sm:col-span-2">
+                  <div className="min-w-56 flex-1">
+                    <Field label="Yeni e-poçt" htmlFor="newEmail">
+                      <input
+                        id="newEmail"
+                        type="email"
+                        name="email"
+                        required
+                        maxLength={254}
+                        autoComplete="off"
+                        placeholder={customer.email ?? ""}
+                        className="input"
+                      />
+                    </Field>
+                  </div>
+
                   <SubmitButton className="btn btn-secondary" pendingText="Yenilənir...">
-                    Giriş məlumatlarını yenilə
+                    E-poçtu dəyiş
                   </SubmitButton>
-                </div>
-              </ActionForm>
-            </section>
-          )}
+                </ActionForm>
+              </div>
+            )}
+          </section>
 
           {!isArchived && (
             <section className="card p-5 sm:p-6">

@@ -40,14 +40,19 @@ export default async function AdminLayout({
             <NavLink href="/admin/products">Məhsullar</NavLink>
             <NavLink href="/admin/categories">Kateqoriyalar</NavLink>
             <NavLink href="/admin/customers">Müştərilər</NavLink>
+            <NavLink href="/admin/staff">İşçilər</NavLink>
             <NavLink href="/admin/audit">Audit</NavLink>
             {SHOW_MFA_SETTINGS && <NavLink href="/security">2FA</NavLink>}
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden max-w-48 truncate text-sm text-zinc-400 lg:block">
+            <Link
+              href="/change-password"
+              className="hidden max-w-48 truncate text-sm text-zinc-400 hover:text-white lg:block"
+              title="Şifrəni dəyiş"
+            >
               {staff.full_name ?? user.email}
-            </span>
+            </Link>
 
             <form action={logout}>
               <SubmitButton

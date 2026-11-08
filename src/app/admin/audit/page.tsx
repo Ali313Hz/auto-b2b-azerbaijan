@@ -17,6 +17,21 @@ const actionLabels: Record<string, string> = {
   "customer.password_changed": "Şifrə dəyişdirildi",
   "customer.mfa_reset": "2FA sıfırlandı",
   "customer.deleted": "Müştəri silindi",
+  customer_created: "Müştəri hesabı yaradıldı",
+  customer_password_reset: "Müştəri şifrəsi sıfırlandı",
+  customer_email_changed: "Müştəri e-poçtu dəyişdirildi",
+  customer_activated: "Müştəri aktiv edildi",
+  customer_deactivated: "Müştəri deaktiv edildi",
+  customer_archived: "Müştəri arxivləşdirildi",
+  customer_restored: "Müştəri arxivdən çıxarıldı",
+  customer_mfa_reset: "Müştəri 2FA sıfırlandı",
+  customer_deleted: "Müştəri silindi",
+  staff_created: "İşçi hesabı yaradıldı",
+  staff_password_reset: "İşçi şifrəsi sıfırlandı",
+  staff_email_changed: "İşçi e-poçtu dəyişdirildi",
+  staff_role_changed: "İşçi rolu dəyişdirildi",
+  staff_activated: "İşçi aktiv edildi",
+  staff_deactivated: "İşçi deaktiv edildi",
 };
 
 const tableLabels: Record<string, string> = {
@@ -85,7 +100,12 @@ export default async function AuditPage({
             </thead>
             <tbody>
               {rows.map((row) => {
-                const changed = (row.details as { changed?: string[] } | null)?.changed;
+                const details = row.details as
+                  | { changed?: string[]; from?: string; to?: string }
+                  | null;
+                const changed =
+                  details?.changed?.join(", ") ??
+                  (details?.from && details.to ? `${details.from} → ${details.to}` : null);
 
                 return (
                   <tr key={row.id}>
@@ -93,7 +113,7 @@ export default async function AuditPage({
                     <td>{row.actor_name ?? (row.actor_user_id ? "—" : "Sistem / server")}</td>
                     <td className="whitespace-nowrap">{describe(row.action)}</td>
                     <td className="font-mono text-xs text-zinc-500">{row.target_id?.slice(0, 8) ?? "—"}</td>
-                    <td className="text-xs text-zinc-400">{changed?.join(", ") ?? "—"}</td>
+                    <td className="text-xs text-zinc-400">{changed ?? "—"}</td>
                   </tr>
                 );
               })}
