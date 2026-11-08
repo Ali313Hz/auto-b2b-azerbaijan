@@ -203,8 +203,8 @@ revoke execute on function public.get_admin_categories() from public, anon;
 grant execute on function public.get_admin_categories() to authenticated;
 
 
--- New overloads with an explicit parent. The old 4/5-argument versions stay
--- until the new application code is deployed and are dropped afterwards.
+-- New overloads with an explicit parent. The old 4/5-argument versions
+-- (still OWNER-only) remain and leave parent_id unchanged.
 create function public.create_admin_category(
   p_name text,
   p_slug text,
