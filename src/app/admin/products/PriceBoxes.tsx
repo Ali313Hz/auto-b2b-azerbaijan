@@ -16,7 +16,8 @@ const boxes = [
 // ever sees the price of their own group; the server chooses it.
 export default function PriceBoxes(props: PriceBoxesProps) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    // Three in a row when there is room, otherwise they wrap (narrow cards).
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(10.5rem,1fr))] gap-3">
       {boxes.map((box) => (
         <div key={box.key} className={`min-w-0 rounded-xl border-2 bg-zinc-950 p-3 ${box.tone}`}>
           <label htmlFor={box.name} className="block font-semibold text-white">
