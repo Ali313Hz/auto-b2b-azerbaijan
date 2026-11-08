@@ -29,6 +29,11 @@ export function formatDate(value: string) {
   return dateFormatter.format(new Date(value));
 }
 
+// True when a timestamp lies in the past (temporary password expiry).
+export function isPast(value: string | null | undefined) {
+  return value ? new Date(value).getTime() <= Date.now() : false;
+}
+
 export function shortId(id: string) {
   return id.slice(0, 8).toUpperCase();
 }
@@ -64,3 +69,21 @@ export function readPage(value: string | string[] | undefined) {
 
 export const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type StaffRole = Database["public"]["Enums"]["staff_role"];
+
+export const staffRoles = [
+  "OWNER",
+  "SALES",
+  "PRODUCT_MANAGER",
+  "SUPPORT",
+  "WAREHOUSE",
+] as const satisfies readonly StaffRole[];
+
+export const staffRoleLabels: Record<StaffRole, string> = {
+  OWNER: "Sahib (OWNER)",
+  SALES: "Satış",
+  PRODUCT_MANAGER: "Məhsul meneceri",
+  SUPPORT: "Dəstək",
+  WAREHOUSE: "Anbar",
+};

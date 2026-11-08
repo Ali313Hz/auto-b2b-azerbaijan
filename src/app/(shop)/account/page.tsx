@@ -62,6 +62,10 @@ export default async function AccountPage() {
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/change-password" className="btn btn-secondary">
+            Şifrəni dəyiş
+          </Link>
+
           {SHOW_MFA_SETTINGS && (
             <Link href="/security" className="btn btn-secondary">
               İki mərhələli təsdiq

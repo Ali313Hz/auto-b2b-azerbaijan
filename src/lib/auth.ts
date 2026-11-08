@@ -21,7 +21,7 @@ export const getSession = cache(async () => {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { supabase, user: null, mfaVerified: false, staff: null, customer: null };
+    return { supabase, user: null, mfaVerified: false, staff: null, customer: null, account: null };
   }
 
   // getUser() validated this session's access token with the Auth server,
@@ -35,10 +35,10 @@ export const getSession = cache(async () => {
     aal?.currentLevel === "aal2" || (!MFA_REQUIRED && !hasVerifiedFactor);
 
   if (!mfaVerified) {
-    return { supabase, user, mfaVerified: false, staff: null, customer: null };
+    return { supabase, user, mfaVerified: false, staff: null, customer: null, account: null };
   }
 
-  const [{ data: staff }, { data: customer }] = await Promise.all([
+  const [{ data: staff }, { data: customer }, { data: accountRows }] = await Promise.all([
     supabase
       .from("staff_profiles")
       .select("full_name, role, active")
@@ -49,10 +49,36 @@ export const getSession = cache(async () => {
       .select("company_name, contact_name, phone, price_group, active, archived_at")
       .eq("id", user.id)
       .maybeSingle(),
+    // Same checks the database applies to every RPC: is this session still
+    // valid after the last password change, and is a temporary password
+    // waiting to be replaced?
+    supabase.rpc("get_my_account_state"),
   ]);
 
-  return { supabase, user, mfaVerified: true, staff, customer };
+  return {
+    supabase,
+    user,
+    mfaVerified: true,
+    staff,
+    customer,
+    account: accountRows?.[0] ?? null,
+  };
 });
+
+type Session = Awaited<ReturnType<typeof getSession>>;
+
+// Sends sessions from before a password change back to login, and users
+// with a temporary password to the change-password page. The database
+// refuses these sessions anyway; this only keeps the UI consistent.
+function enforceAccountState(session: Session) {
+  if (session.account && !session.account.session_current) {
+    redirect("/login?error=session");
+  }
+
+  if (session.account?.must_change_password) {
+    redirect("/change-password");
+  }
+}
 
 export async function requireOwner() {
   const session = await getSession();
@@ -64,6 +90,8 @@ export async function requireOwner() {
   if (!session.mfaVerified) {
     redirect("/mfa");
   }
+
+  enforceAccountState(session);
 
   const { staff } = session;
 
@@ -84,6 +112,8 @@ export async function requireCustomer() {
   if (!session.mfaVerified) {
     redirect("/mfa");
   }
+
+  enforceAccountState(session);
 
   if (session.staff?.active && session.staff.role === "OWNER") {
     redirect("/admin");
@@ -112,6 +142,28 @@ export async function requireMfaUser() {
 
   if (!session.mfaVerified) {
     redirect("/mfa");
+  }
+
+  enforceAccountState(session);
+
+  return { ...session, user: session.user };
+}
+
+// Signed in with a still-valid session; a pending temporary password is
+// allowed (change-password page).
+export async function requireCurrentSession() {
+  const session = await getSession();
+
+  if (!session.user) {
+    redirect("/login");
+  }
+
+  if (!session.mfaVerified) {
+    redirect("/mfa");
+  }
+
+  if (session.account && !session.account.session_current) {
+    redirect("/login?error=session");
   }
 
   return { ...session, user: session.user };

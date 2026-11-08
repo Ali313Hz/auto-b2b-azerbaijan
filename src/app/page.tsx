@@ -7,7 +7,7 @@ import { getSession } from "@/lib/auth";
 import { logout } from "./(shop)/account/actions";
 
 export default async function Home() {
-  const { user, mfaVerified, staff, customer } = await getSession();
+  const { user, mfaVerified, staff, customer, account } = await getSession();
 
   if (!user) {
     redirect("/login");
@@ -15,6 +15,14 @@ export default async function Home() {
 
   if (!mfaVerified) {
     redirect("/mfa");
+  }
+
+  if (account && !account.session_current) {
+    redirect("/login?error=session");
+  }
+
+  if (account?.must_change_password) {
+    redirect("/change-password");
   }
 
   if (staff?.active && staff.role === "OWNER") {

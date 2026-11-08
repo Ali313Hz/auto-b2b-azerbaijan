@@ -1,31 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
-import Script from "next/script";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useTurnstile } from "@/components/useTurnstile";
 import { createClient } from "@/lib/supabase/client";
-
-type Turnstile = {
-  render: (
-    element: HTMLElement,
-    options: {
-      sitekey: string;
-      callback: (token: string) => void;
-      "expired-callback": () => void;
-      "error-callback": () => void;
-      theme?: "dark" | "light" | "auto";
-      language?: string;
-    }
-  ) => string;
-  reset: (widgetId?: string) => void;
-};
-
-declare global {
-  interface Window {
-    turnstile?: Turnstile;
-  }
-}
 
 const GENERIC_ERROR = "E-poçt və ya şifrə yanlışdır.";
 
@@ -44,38 +23,20 @@ type LoginFormProps = {
 // real client IP. Error messages never reveal whether an e-mail exists.
 export default function LoginForm({ errorCode, turnstileSiteKey }: LoginFormProps) {
   const router = useRouter();
-  const widgetRef = useRef<HTMLDivElement>(null);
-  const widgetId = useRef<string | null>(null);
+  const turnstile = useTurnstile(turnstileSiteKey);
 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(
     errorCode ? (errorMessages[errorCode] ?? GENERIC_ERROR) : null
   );
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
 
-  // A deactivated or expired account must not keep a half-open session.
+  // A deactivated account or a session from before a password change must
+  // not keep a half-open session in this browser.
   useEffect(() => {
     if (errorCode === "inactive" || errorCode === "session") {
-      void createClient().auth.signOut();
+      void createClient().auth.signOut({ scope: "local" });
     }
   }, [errorCode]);
-
-  useEffect(() => {
-    if (!turnstileSiteKey || !scriptReady || !widgetRef.current || widgetId.current) {
-      return;
-    }
-
-    widgetId.current =
-      window.turnstile?.render(widgetRef.current, {
-        sitekey: turnstileSiteKey,
-        theme: "dark",
-        language: "az",
-        callback: (token) => setCaptchaToken(token),
-        "expired-callback": () => setCaptchaToken(null),
-        "error-callback": () => setCaptchaToken(null),
-      }) ?? null;
-  }, [turnstileSiteKey, scriptReady]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,29 +54,26 @@ export default function LoginForm({ errorCode, turnstileSiteKey }: LoginFormProp
       return;
     }
 
-    if (turnstileSiteKey && !captchaToken) {
-      setError("Təhlükəsizlik yoxlamasını tamamlayın.");
-      return;
-    }
-
     setPending(true);
     setError(null);
 
-    const supabase = createClient();
+    const captchaToken = await turnstile.getToken();
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    if (captchaToken === null) {
+      setError("Təhlükəsizlik yoxlaması alınmadı. Yenidən cəhd edin.");
+      turnstile.reset();
+      setPending(false);
+      return;
+    }
+
+    const { error: signInError } = await createClient().auth.signInWithPassword({
       email,
       password,
       options: captchaToken ? { captchaToken } : undefined,
     });
 
     if (signInError) {
-      // A CAPTCHA token is single-use.
-      if (turnstileSiteKey) {
-        window.turnstile?.reset(widgetId.current ?? undefined);
-        setCaptchaToken(null);
-      }
-
+      turnstile.reset();
       setError(
         signInError.status === 429
           ? "Çox sayda cəhd edildi. Bir neçə dəqiqə sonra yenidən cəhd edin."
@@ -127,22 +85,14 @@ export default function LoginForm({ errorCode, turnstileSiteKey }: LoginFormProp
       return;
     }
 
-    // Password accepted; the home page routes to the TOTP step when the
-    // user has an authenticator, otherwise to the shop or admin panel.
+    // The home page sends the user to the shop, the admin panel or, with a
+    // temporary password, to the change-password page.
     router.replace("/");
     router.refresh();
   }
 
   return (
     <>
-      {turnstileSiteKey && (
-        <Script
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-          strategy="afterInteractive"
-          onReady={() => setScriptReady(true)}
-        />
-      )}
-
       {error && (
         <p
           role="alert"
@@ -185,7 +135,7 @@ export default function LoginForm({ errorCode, turnstileSiteKey }: LoginFormProp
           />
         </div>
 
-        {turnstileSiteKey && <div ref={widgetRef} className="min-h-[65px]" />}
+        {turnstile.widget}
 
         <button
           type="submit"
