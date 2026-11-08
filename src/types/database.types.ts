@@ -469,6 +469,14 @@ export type Database = {
     }
     Functions: {
       current_user_is_owner: { Args: never; Returns: boolean }
+      get_my_staff_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["staff_role"] | null
+      }
+      update_admin_product_stock: {
+        Args: { p_product_id: string; p_stock: number }
+        Returns: undefined
+      }
       complete_password_change: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: undefined
