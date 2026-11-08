@@ -11,6 +11,7 @@ export const access = {
   customersEdit: ["OWNER", "SALES"],
   ordersView: ["OWNER", "SALES", "WAREHOUSE", "SUPPORT"],
   ordersProcess: ["OWNER", "SALES", "WAREHOUSE"],
+  ordersEdit: ["OWNER", "SALES"],
   productsView: ["OWNER", "PRODUCT_MANAGER", "WAREHOUSE"],
   productsEdit: ["OWNER", "PRODUCT_MANAGER"],
   stockEdit: ["OWNER", "PRODUCT_MANAGER", "WAREHOUSE"],

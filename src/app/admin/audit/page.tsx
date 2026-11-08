@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import Pagination from "@/components/Pagination";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
@@ -20,6 +21,12 @@ const actionLabels: Record<string, string> = {
   customer_created: "Müştəri hesabı yaradıldı",
   customer_password_reset: "Müştəri şifrəsi sıfırlandı",
   customer_password_changed: "Müştəri şifrəsi dəyişdirildi",
+  order_revision_created: "Sifariş dəyişikliyi yaradıldı",
+  order_revision_updated: "Sifariş dəyişikliyi yeniləndi",
+  order_revision_sent: "Dəyişiklik müştəriyə göndərildi",
+  order_revision_resent: "Dəyişiklik yenidən göndərildi",
+  order_revision_accepted: "Müştəri dəyişikliyi qəbul etdi",
+  order_revision_rejected: "Müştəri dəyişikliyi qəbul etmədi",
   customer_email_changed: "Müştəri e-poçtu dəyişdirildi",
   customer_activated: "Müştəri aktiv edildi",
   customer_deactivated: "Müştəri deaktiv edildi",
@@ -102,18 +109,27 @@ export default async function AuditPage({
             <tbody>
               {rows.map((row) => {
                 const details = row.details as
-                  | { changed?: string[]; from?: string; to?: string }
+                  | { changed?: string[]; from?: string; to?: string; version?: number }
                   | null;
                 const changed =
                   details?.changed?.join(", ") ??
-                  (details?.from && details.to ? `${details.from} → ${details.to}` : null);
+                  (details?.from && details.to ? `${details.from} → ${details.to}` : null) ??
+                  (details?.version ? `Versiya ${details.version}` : null);
 
                 return (
                   <tr key={row.id}>
                     <td className="whitespace-nowrap text-zinc-400">{formatDate(row.created_at)}</td>
                     <td>{row.actor_name ?? (row.actor_user_id ? "—" : "Sistem / server")}</td>
                     <td className="whitespace-nowrap">{describe(row.action)}</td>
-                    <td className="font-mono text-xs text-zinc-500">{row.target_id?.slice(0, 8) ?? "—"}</td>
+                    <td className="font-mono text-xs text-zinc-500">
+                      {row.target_type === "order" && row.target_id ? (
+                        <Link href={`/admin/orders/${row.target_id}`} className="hover:text-amber-400">
+                          {row.target_id.slice(0, 8)}
+                        </Link>
+                      ) : (
+                        row.target_id?.slice(0, 8) ?? "—"
+                      )}
+                    </td>
                     <td className="text-xs text-zinc-400">{changed ?? "—"}</td>
                   </tr>
                 );

@@ -44,6 +44,22 @@ const dbMessages: Record<string, string> = {
   "Category name is required": "Kateqoriya adı mütləqdir (maks. 100 simvol).",
   "Category slug is required":
     "Slug yalnız kiçik latın hərfləri, rəqəmlər və tire ola bilər.",
+  "Cancelled orders cannot be changed": "Ləğv edilmiş sifariş dəyişdirilə bilməz.",
+  "Revision not found": "Dəyişiklik tapılmadı.",
+  "Only drafts can be edited":
+    "Bu dəyişiklik artıq müştəriyə göndərilib. Yeni dəyişiklik yaradın.",
+  "Only drafts can be sent": "Bu dəyişiklik artıq göndərilib.",
+  "Only revisions awaiting the customer can be re-sent":
+    "Yalnız müştəri cavabını gözləyən dəyişiklik yenidən göndərilə bilər.",
+  "Revision has no items": "Sifarişdə ən azı bir məhsul olmalıdır.",
+  "Revision is no longer open":
+    "Bu dəyişiklik artıq bağlanıb. Səhifəni yeniləyin.",
+  "Order is cancelled": "Sifariş ləğv edilib.",
+  "Invalid quantity": "Miqdar 1 ilə 100 000 arasında tam ədəd olmalıdır.",
+  "Invalid price": "Qiymət 0 və ya daha böyük olmalıdır.",
+  "Invalid order items": "Sifariş məhsulları yanlışdır.",
+  "Duplicate product": "Eyni məhsul iki dəfə əlavə edilib.",
+  "Note is too long": "Qeyd ən çox 2000 simvol ola bilər.",
 };
 
 export function dbErrorMessage(
@@ -51,6 +67,10 @@ export function dbErrorMessage(
   fallback: string
 ) {
   const message = error?.message ?? "";
+
+  if (message.startsWith("Insufficient stock for ")) {
+    return `Stokda kifayət qədər məhsul yoxdur (${message.slice(23)}).`;
+  }
 
   if (message.startsWith("Not authorized")) {
     return "Bu əməliyyat üçün icazəniz yoxdur.";
