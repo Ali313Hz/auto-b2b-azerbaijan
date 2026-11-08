@@ -1,0 +1,13 @@
+{
+  "name": "auto-b2b-db-tests",
+  "private": true,
+  "type": "module",
+  "description": "Database security and order tests on a local Postgres 17 (no Supabase project needed).",
+  "scripts": {
+    "test": "node run-all.mjs"
+  },
+  "dependencies": {
+    "embedded-postgres": "17.11.0-beta.19",
+    "pg": "8.23.1"
+  }
+}
