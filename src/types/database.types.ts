@@ -501,6 +501,103 @@ export type Database = {
           temporary_password_expires_at: string | null
         }[]
       }
+      create_admin_order_revision: {
+        Args: { p_order_id: string }
+        Returns: string
+      }
+      discard_admin_order_revision: {
+        Args: { p_revision_id: string }
+        Returns: undefined
+      }
+      get_admin_order_lines: {
+        Args: { p_order_id: string }
+        Returns: {
+          id: string
+          line_total: number
+          product_id: string
+          product_name: string
+          quantity: number
+          sku: string
+          stock: number | null
+          unit_price: number
+        }[]
+      }
+      get_admin_order_revision_states: {
+        Args: never
+        Returns: {
+          order_id: string
+          status: Database["public"]["Enums"]["order_revision_status"]
+          version: number
+        }[]
+      }
+      get_admin_order_revisions: {
+        Args: { p_order_id: string }
+        Returns: {
+          created_at: string
+          created_by_name: string | null
+          id: string
+          items: Json
+          last_sent_at: string | null
+          note: string | null
+          responded_at: string | null
+          sent_at: string | null
+          sent_count: number
+          status: Database["public"]["Enums"]["order_revision_status"]
+          total_amount: number
+          updated_at: string
+          version: number
+        }[]
+      }
+      get_customer_order_alerts: {
+        Args: never
+        Returns: {
+          last_sent_at: string | null
+          order_id: string
+          revision_id: string
+        }[]
+      }
+      get_customer_order_revisions: {
+        Args: { p_order_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          items: Json
+          last_sent_at: string | null
+          note: string | null
+          responded_at: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["order_revision_status"]
+          total_amount: number
+          version: number
+        }[]
+      }
+      resend_admin_order_revision: {
+        Args: { p_revision_id: string }
+        Returns: undefined
+      }
+      respond_to_order_revision: {
+        Args: { p_accept: boolean; p_revision_id: string }
+        Returns: Database["public"]["Enums"]["order_revision_status"]
+      }
+      save_admin_order_revision: {
+        Args: { p_items: Json; p_note: string | null; p_revision_id: string }
+        Returns: number
+      }
+      search_admin_order_products: {
+        Args: { p_order_id: string; p_search: string }
+        Returns: {
+          active: boolean
+          catalog_price: number | null
+          id: string
+          name: string
+          sku: string
+          stock: number
+        }[]
+      }
+      send_admin_order_revision: {
+        Args: { p_revision_id: string }
+        Returns: undefined
+      }
       get_admin_staff: {
         Args: never
         Returns: {
@@ -902,6 +999,12 @@ export type Database = {
     }
     Enums: {
       customer_price_group: "NORMAL" | "DEALER" | "VIP"
+      order_revision_status:
+        | "DRAFT"
+        | "AWAITING_CUSTOMER"
+        | "ACCEPTED"
+        | "REJECTED"
+        | "SUPERSEDED"
       order_status: "PENDING" | "CONFIRMED" | "CANCELLED"
       staff_role:
         | "OWNER"
@@ -1040,6 +1143,13 @@ export const Constants = {
   public: {
     Enums: {
       customer_price_group: ["NORMAL", "DEALER", "VIP"],
+      order_revision_status: [
+        "DRAFT",
+        "AWAITING_CUSTOMER",
+        "ACCEPTED",
+        "REJECTED",
+        "SUPERSEDED",
+      ],
       order_status: ["PENDING", "CONFIRMED", "CANCELLED"],
       staff_role: ["OWNER", "SALES", "PRODUCT_MANAGER", "SUPPORT", "WAREHOUSE"],
     },
