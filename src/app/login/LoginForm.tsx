@@ -127,8 +127,9 @@ export default function LoginForm({ errorCode, turnstileSiteKey }: LoginFormProp
       return;
     }
 
-    // Password accepted; the second factor is required before anything else.
-    router.replace("/mfa");
+    // Password accepted; the home page routes to the TOTP step when the
+    // user has an authenticator, otherwise to the shop or admin panel.
+    router.replace("/");
     router.refresh();
   }
 

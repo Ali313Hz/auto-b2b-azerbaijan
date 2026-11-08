@@ -14,8 +14,9 @@ type Enrollment = {
 };
 
 type MfaEnrollProps = {
-  // First enrollment (login) or an extra backup device (security page).
-  mode?: "required" | "backup";
+  // Mandatory first enrollment at login (only when MFA is required),
+  // an optional first device, or an extra backup device (security page).
+  mode?: "required" | "optional" | "backup";
 };
 
 export default function MfaEnroll({ mode = "required" }: MfaEnrollProps) {
@@ -105,12 +106,14 @@ export default function MfaEnroll({ mode = "required" }: MfaEnrollProps) {
   return (
     <>
       <h1 className="text-xl font-semibold text-white">
-        {mode === "required" ? "Autentifikatoru qoşun" : "Ehtiyat cihaz əlavə edin"}
+        {mode === "backup" ? "Ehtiyat cihaz əlavə edin" : "Autentifikatoru qoşun"}
       </h1>
       <p className="mt-1 text-sm text-zinc-400">
         {mode === "required"
           ? "Hesabınızın təhlükəsizliyi üçün iki mərhələli təsdiq məcburidir."
-          : "İkinci telefon və ya planşet əsas cihaz itdikdə giriş imkanını saxlayır."}
+          : mode === "optional"
+            ? "Könüllüdür: qoşduqdan sonra hər girişdə şifrədən əlavə 6 rəqəmli kod soruşulacaq."
+            : "İkinci telefon və ya planşet əsas cihaz itdikdə giriş imkanını saxlayır."}
       </p>
 
       <ol className="mt-5 list-decimal space-y-1 pl-5 text-sm text-zinc-300">

@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 };
 
 export default async function AddFactorPage() {
-  await requireMfaUser();
+  const { supabase } = await requireMfaUser();
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const hasFactor = (factors?.totp ?? []).length > 0;
 
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
@@ -21,7 +23,7 @@ export default async function AddFactorPage() {
         </div>
 
         <div className="card p-6 sm:p-8">
-          <MfaEnroll mode="backup" />
+          <MfaEnroll mode={hasFactor ? "backup" : "optional"} />
         </div>
 
         <p className="mt-4 text-center">

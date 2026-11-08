@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { type ActionResult, fail, ok } from "@/lib/action-result";
 import { requireMfaUser } from "@/lib/auth";
+import { MFA_REQUIRED } from "@/lib/mfa";
 
 // Removes one of the user's own authenticators. The last verified one can
-// never be removed: MFA is mandatory.
+// only be removed while MFA is optional.
 export async function removeFactor(
   _state: ActionResult,
   formData: FormData
@@ -26,7 +27,7 @@ export async function removeFactor(
     return fail("Cihaz tapılmadı.");
   }
 
-  if (verified.length < 2) {
+  if (MFA_REQUIRED && verified.length < 2) {
     return fail("Son autentifikatoru silmək olmaz. Əvvəlcə ehtiyat cihaz əlavə edin.");
   }
 

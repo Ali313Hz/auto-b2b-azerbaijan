@@ -3,13 +3,16 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
+import { MFA_REQUIRED } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 
 // Deduplicated per request so layouts and pages share one auth lookup.
 //
-// Profiles are only read after the session reached aal2 (password + TOTP).
-// The database enforces the same rule; this keeps the UI from rendering
-// pages whose data calls would be rejected.
+// mfaVerified means the session meets the MFA rule: it reached aal2
+// (password + TOTP), or MFA is optional and the user has no verified
+// authenticator. The database enforces the same rule
+// (private.mfa_satisfied); this keeps the UI from rendering pages whose data
+// calls would be rejected.
 export const getSession = cache(async () => {
   const supabase = await createClient();
 
@@ -22,10 +25,16 @@ export const getSession = cache(async () => {
   }
 
   // getUser() validated this session's access token with the Auth server,
-  // so the aal claim decoded from the same token can be trusted.
+  // so the aal claim decoded from the same token can be trusted, and its
+  // factor list is current.
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const hasVerifiedFactor = (user.factors ?? []).some(
+    (factor) => factor.status === "verified"
+  );
+  const mfaVerified =
+    aal?.currentLevel === "aal2" || (!MFA_REQUIRED && !hasVerifiedFactor);
 
-  if (aal?.currentLevel !== "aal2") {
+  if (!mfaVerified) {
     return { supabase, user, mfaVerified: false, staff: null, customer: null };
   }
 
@@ -93,7 +102,7 @@ export async function requireCustomer() {
   return { ...session, user: session.user, customer };
 }
 
-// Any signed-in user who completed MFA (used by the security settings page).
+// Any signed-in user whose session meets the MFA rule (security settings).
 export async function requireMfaUser() {
   const session = await getSession();
 

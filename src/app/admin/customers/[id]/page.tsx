@@ -258,13 +258,13 @@ export default async function AdminCustomerDetailPage({
               <p className="mt-1 mb-4 text-sm text-zinc-400">
                 Müştəri autentifikator cihazını itiribsə, kimliyini başqa
                 kanalla (telefon zəngi, şəxsən) yoxladıqdan sonra sıfırlayın.
-                Növbəti girişdə müştəri yeni cihaz qoşmalı olacaq. Əməliyyat
-                audit jurnalına yazılır.
+                Bundan sonra müştəri yalnız şifrə ilə daxil olur və istəsə yeni
+                cihaz qoşa bilər. Əməliyyat audit jurnalına yazılır.
               </p>
 
               <ActionForm
                 action={resetCustomerMfa}
-                confirmMessage="Müştərinin bütün autentifikator cihazları silinsin? Müştəri növbəti girişdə yenisini qoşmalı olacaq."
+                confirmMessage="Müştərinin bütün autentifikator cihazları silinsin? Müştəri yalnız şifrə ilə daxil olacaq."
               >
                 <input type="hidden" name="customerId" value={customer.id} />
                 <SubmitButton className="btn btn-danger" pendingText="Sıfırlanır...">

@@ -5,6 +5,7 @@ import NavLink from "@/components/NavLink";
 import SubmitButton from "@/components/SubmitButton";
 import { Logo } from "@/components/ui";
 import { requireOwner } from "@/lib/auth";
+import { SHOW_MFA_SETTINGS } from "@/lib/mfa";
 
 import { logout } from "../(shop)/account/actions";
 
@@ -40,7 +41,7 @@ export default async function AdminLayout({
             <NavLink href="/admin/categories">Kateqoriyalar</NavLink>
             <NavLink href="/admin/customers">Müştərilər</NavLink>
             <NavLink href="/admin/audit">Audit</NavLink>
-            <NavLink href="/security">2FA</NavLink>
+            {SHOW_MFA_SETTINGS && <NavLink href="/security">2FA</NavLink>}
           </nav>
 
           <div className="ml-auto flex items-center gap-3">

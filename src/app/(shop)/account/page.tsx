@@ -5,6 +5,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { Badge, PageHeader } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
 import { priceGroupLabels } from "@/lib/format";
+import { SHOW_MFA_SETTINGS } from "@/lib/mfa";
 
 import { logout } from "./actions";
 
@@ -61,9 +62,11 @@ export default async function AccountPage() {
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/security" className="btn btn-secondary">
-            İki mərhələli təsdiq
-          </Link>
+          {SHOW_MFA_SETTINGS && (
+            <Link href="/security" className="btn btn-secondary">
+              İki mərhələli təsdiq
+            </Link>
+          )}
 
           <form action={logout}>
             <SubmitButton className="btn btn-secondary" pendingText="Çıxılır...">

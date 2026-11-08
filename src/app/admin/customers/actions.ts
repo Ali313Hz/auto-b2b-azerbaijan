@@ -61,7 +61,7 @@ async function getAuthedClient() {
 }
 
 // Service-role operations bypass RLS, so the database confirms the caller
-// is an active OWNER with an MFA (aal2) session before the secret key is
+// is an active OWNER whose session meets the MFA rule before the secret key is
 // used. Any error or doubt means no access.
 async function getOwnerClient() {
   const { supabase } = await getAuthedClient();
@@ -536,5 +536,5 @@ export async function resetCustomerMfa(
 
   revalidateCustomerPaths(customerId);
 
-  return ok("2FA sıfırlandı. Müştəri növbəti girişdə yeni cihaz qoşacaq.");
+  return ok("2FA sıfırlandı. Müştəri şifrə ilə daxil ola bilər.");
 }

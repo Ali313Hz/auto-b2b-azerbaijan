@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import SubmitButton from "@/components/SubmitButton";
 import { Logo } from "@/components/ui";
+import { MFA_REQUIRED } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 
 import { logout } from "../(shop)/account/actions";
@@ -13,8 +14,9 @@ export const metadata: Metadata = {
   title: "İki mərhələli təsdiq",
 };
 
-// Second login step. Users without a verified authenticator must enroll
-// one here; everyone else enters a 6-digit TOTP code.
+// Second login step for users with a verified authenticator: they enter a
+// 6-digit TOTP code. Users without one only enroll here when MFA is
+// mandatory (MFA_REQUIRED); otherwise they go straight on.
 export default async function MfaPage() {
   const supabase = await createClient();
 
@@ -42,6 +44,10 @@ export default async function MfaPage() {
     id: factor.id,
     name: factor.friendly_name ?? "Autentifikator",
   }));
+
+  if (verified.length === 0 && !MFA_REQUIRED) {
+    redirect("/");
+  }
 
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
