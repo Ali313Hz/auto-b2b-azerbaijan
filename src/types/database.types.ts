@@ -529,6 +529,10 @@ export type Database = {
         Args: { p_account_type: "customer" | "staff"; p_user_id: string }
         Returns: string
       }
+      set_admin_customer_password_state: {
+        Args: { p_customer_id: string }
+        Returns: undefined
+      }
       update_admin_staff: {
         Args: {
           p_active: boolean
