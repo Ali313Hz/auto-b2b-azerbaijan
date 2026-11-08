@@ -3,15 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import ActionForm from "@/components/ActionForm";
-import PasswordResetForm from "@/components/PasswordResetForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, Field, PageHeader } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
+import { PASSWORD_MIN_LENGTH, PASSWORD_RULE_TEXT } from "@/lib/password";
 import { can } from "@/lib/roles";
 import {
   formatAzn,
   formatDate,
-  isPast,
   orderStatusLabels,
   orderStatusTones,
   priceGroupLabels,
@@ -23,7 +22,7 @@ import {
   archiveCustomer,
   permanentlyDeleteCustomer,
   restoreCustomer,
-  resetCustomerPassword,
+  setCustomerPassword,
   updateCustomerActive,
   updateCustomerEmail,
   updateCustomerPriceGroup,
@@ -65,8 +64,6 @@ export default async function AdminCustomerDetailPage({
   );
   const isArchived = customer.archived_at !== null;
   const login = loginRows?.[0];
-  const tempExpired =
-    login?.must_change_password && isPast(login.temporary_password_expires_at);
 
   return (
     <>
@@ -231,7 +228,7 @@ export default async function AdminCustomerDetailPage({
             <h2 className="font-semibold text-white">Giriş və şifrə</h2>
             <p className="mt-1 mb-4 text-sm text-zinc-400">
               Mövcud şifrəni heç kim görə bilməz. Müştəri şifrəsini
-              unudubsa, müvəqqəti şifrə təyin edin.
+              unudubsa, ona yeni şifrə təyin edin.
             </p>
 
             <dl className="mb-4 divide-y divide-zinc-800 text-sm">
@@ -252,20 +249,6 @@ export default async function AdminCustomerDetailPage({
                 </dd>
               </div>
               <div className="flex flex-wrap justify-between gap-2 py-2">
-                <dt className="text-zinc-400">Şifrə</dt>
-                <dd>
-                  {!login?.must_change_password ? (
-                    <span className="text-zinc-300">Müştəri tərəfindən təyin edilib</span>
-                  ) : tempExpired ? (
-                    <Badge tone="red">Müvəqqəti şifrənin vaxtı bitib</Badge>
-                  ) : (
-                    <Badge tone="amber">
-                      Müvəqqəti · {formatDate(login.temporary_password_expires_at!)} qədər
-                    </Badge>
-                  )}
-                </dd>
-              </div>
-              <div className="flex flex-wrap justify-between gap-2 py-2">
                 <dt className="text-zinc-400">Son giriş</dt>
                 <dd className="text-zinc-300">
                   {login?.last_sign_in_at ? formatDate(login.last_sign_in_at) : "—"}
@@ -275,12 +258,48 @@ export default async function AdminCustomerDetailPage({
 
             {!isArchived && (
               <div className="space-y-5">
-                <PasswordResetForm
-                  action={resetCustomerPassword}
-                  idName="customerId"
-                  idValue={customer.id}
-                  confirmMessage="Müştərinin şifrəsi sıfırlansın? Açıq sessiyaları dərhal bağlanacaq."
-                />
+                <ActionForm
+                  action={setCustomerPassword}
+                  resetOnSuccess
+                  className="space-y-3"
+                >
+                  <input type="hidden" name="customerId" value={customer.id} />
+
+                  <Field label="Yeni şifrə" htmlFor="newPassword" hint={PASSWORD_RULE_TEXT}>
+                    <input
+                      id="newPassword"
+                      type="password"
+                      name="password"
+                      required
+                      minLength={PASSWORD_MIN_LENGTH}
+                      maxLength={72}
+                      autoComplete="new-password"
+                      className="input"
+                    />
+                  </Field>
+
+                  <Field label="Yeni şifrəni təkrar yaz" htmlFor="newPasswordConfirm">
+                    <input
+                      id="newPasswordConfirm"
+                      type="password"
+                      name="passwordConfirm"
+                      required
+                      minLength={PASSWORD_MIN_LENGTH}
+                      maxLength={72}
+                      autoComplete="new-password"
+                      className="input"
+                    />
+                  </Field>
+
+                  <p className="text-xs text-zinc-500">
+                    Müştərinin açıq sessiyaları bağlanacaq. Müştəri yeni şifrə
+                    ilə dərhal daxil ola bilər.
+                  </p>
+
+                  <SubmitButton className="btn btn-primary" pendingText="Dəyişdirilir...">
+                    Şifrəni dəyiş
+                  </SubmitButton>
+                </ActionForm>
 
                 <ActionForm
                   action={updateCustomerEmail}

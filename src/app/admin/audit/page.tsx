@@ -19,6 +19,7 @@ const actionLabels: Record<string, string> = {
   "customer.deleted": "Müştəri silindi",
   customer_created: "Müştəri hesabı yaradıldı",
   customer_password_reset: "Müştəri şifrəsi sıfırlandı",
+  customer_password_changed: "Müştəri şifrəsi dəyişdirildi",
   customer_email_changed: "Müştəri e-poçtu dəyişdirildi",
   customer_activated: "Müştəri aktiv edildi",
   customer_deactivated: "Müştəri deaktiv edildi",

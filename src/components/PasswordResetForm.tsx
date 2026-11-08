@@ -20,7 +20,6 @@ type PasswordResetFormProps = {
   ) => Promise<PasswordResetResult>;
   idName: string;
   idValue: string;
-  confirmMessage: string;
   submitLabel?: string;
 };
 
@@ -28,7 +27,6 @@ export default function PasswordResetForm({
   action,
   idName,
   idValue,
-  confirmMessage,
   submitLabel = "Şifrəni sıfırla",
 }: PasswordResetFormProps) {
   const [state, formAction] = useActionState(action, null);
@@ -119,11 +117,6 @@ export default function PasswordResetForm({
         <form
           action={formAction}
           className="space-y-3 rounded-lg border border-zinc-800 p-4"
-          onSubmit={(event) => {
-            if (!window.confirm(confirmMessage)) {
-              event.preventDefault();
-            }
-          }}
         >
           <input type="hidden" name={idName} value={idValue} />
 

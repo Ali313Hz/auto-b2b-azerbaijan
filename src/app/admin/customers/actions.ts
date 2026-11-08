@@ -9,12 +9,10 @@ import {
   fail,
   ok,
 } from "@/lib/action-result";
-import type { PasswordResetResult } from "@/components/PasswordResetForm";
 import {
   getAuthedClient,
   getOwnerClient,
   recordEvent,
-  resetAccountPassword,
 } from "@/lib/owner";
 import { passwordProblem } from "@/lib/password";
 
@@ -187,7 +185,7 @@ export async function createCustomer(
   redirect(`/admin/customers/${createdUser.user.id}?notice=created`);
 }
 
-// E-mail change only. Passwords are changed with resetCustomerPassword.
+// E-mail change only. Passwords are changed with setCustomerPassword.
 export async function updateCustomerEmail(
   _state: ActionResult,
   formData: FormData
@@ -248,43 +246,81 @@ export async function updateCustomerEmail(
 
 // OWNER sets a temporary password (generated or typed). Staff accounts and
 // the OWNER's own account are refused by the database.
-export async function resetCustomerPassword(
-  _state: PasswordResetResult,
+// OWNER sets a new permanent password for a customer who forgot theirs.
+// The current password is never shown or stored; the new one goes only to
+// Supabase Auth (bcrypt) through the server-side Admin API and is never
+// returned, logged or written to the database.
+export async function setCustomerPassword(
+  _state: ActionResult,
   formData: FormData
-): Promise<PasswordResetResult> {
+): Promise<ActionResult> {
   const customerId = readText(formData, "customerId");
+  const password = formData.get("password");
+  const confirm = formData.get("passwordConfirm");
 
   if (!customerId) {
-    return { ok: false, message: "Müştəri məlumatı yanlışdır." };
+    return fail("Müştəri məlumatı yanlışdır.");
+  }
+
+  if (typeof password !== "string" || typeof confirm !== "string") {
+    return fail("Yeni şifrəni daxil edin.");
+  }
+
+  if (password !== confirm) {
+    return fail("Şifrələr eyni deyil.");
+  }
+
+  const problem = passwordProblem(password);
+
+  if (problem) {
+    return fail(problem);
   }
 
   const owner = await getOwnerClient();
 
   if (!owner) {
-    return { ok: false, message: "Bu əməliyyat üçün icazəniz yoxdur." };
+    return fail("Bu əməliyyat üçün icazəniz yoxdur.");
   }
 
-  const { data: login, error: loginError } = await owner.supabase.rpc(
-    "get_admin_customer_login",
+  if (customerId === owner.user.id) {
+    return fail("Öz şifrənizi “Şifrəni dəyiş” səhifəsində dəyişin.");
+  }
+
+  // The database confirms the OWNER and that the target is a customer
+  // (not staff, not archived), ends the old sessions' access and writes the
+  // audit row before the secret key is used.
+  const { error: stateError } = await owner.supabase.rpc(
+    "set_admin_customer_password_state",
     { p_customer_id: customerId }
   );
 
-  if (loginError || !login?.[0]) {
-    return { ok: false, message: "Müştəri tapılmadı." };
+  if (stateError) {
+    return fail(
+      stateError.message === "Archived customer cannot be changed"
+        ? "Arxivdəki müştərinin şifrəsi dəyişdirilə bilməz."
+        : stateError.message === "Customer not found"
+          ? "Müştəri tapılmadı."
+          : "Şifrə dəyişdirilmədi."
+    );
   }
 
-  if (login[0].archived_at) {
-    return {
-      ok: false,
-      message: "Arxivdəki müştərinin şifrəsi sıfırlana bilməz.",
-    };
-  }
-
-  const result = await resetAccountPassword(owner, customerId, "customer", formData);
+  // Supabase also signs the user out everywhere when the password changes.
+  const { error: authError } = await owner.admin.auth.admin.updateUserById(
+    customerId,
+    { password }
+  );
 
   revalidateCustomerPaths(customerId);
 
-  return result;
+  if (authError) {
+    return fail(
+      authError.code === "weak_password"
+        ? "Şifrə Supabase şifrə qaydasına uyğun deyil. Başqa şifrə seçin."
+        : "Şifrə dəyişdirilmədi. Yenidən cəhd edin."
+    );
+  }
+
+  return ok("Şifrə uğurla dəyişdirildi.");
 }
 
 export async function updateCustomerProfile(

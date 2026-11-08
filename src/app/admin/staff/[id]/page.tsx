@@ -158,7 +158,6 @@ export default async function AdminStaffDetailPage({
                 action={resetStaffPassword}
                 idName="staffId"
                 idValue={member.id}
-                confirmMessage="İşçinin şifrəsi sıfırlansın? Açıq sessiyaları dərhal bağlanacaq."
               />
 
               <ActionForm
