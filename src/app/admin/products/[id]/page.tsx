@@ -18,10 +18,9 @@ import {
   updateProductActive,
   updateProductContent,
   updateProductStock,
-  uploadProductImage,
 } from "../actions";
-import ImageFileInput from "../ImageFileInput";
-import PriceFields from "../PriceFields";
+import PriceBoxes from "../PriceBoxes";
+import ProductImageUploader from "../ProductImageUploader";
 import ProductVideoUpload from "../ProductVideoUpload";
 
 export const metadata: Metadata = {
@@ -29,7 +28,11 @@ export const metadata: Metadata = {
 };
 
 const notices: Record<string, { tone: "green" | "amber"; text: string }> = {
-  created: { tone: "green", text: "Məhsul yaradıldı. İndi şəkil və video əlavə edə bilərsiniz." },
+  created: { tone: "green", text: "Məhsul uğurla yaradıldı." },
+  "media-failed": {
+    tone: "amber",
+    text: "Məhsul yaradıldı, amma bəzi şəkil və ya videolar yüklənmədi. Məhsul deaktiv saxlanıldı. Aşağıda yenidən yükləyin, sonra “Aktiv et” düyməsini basın.",
+  },
   "content-failed": {
     tone: "amber",
     text: "Məhsul yaradıldı, lakin ad/təsvir yadda saxlanmadı. Aşağıdan yenidən yadda saxlayın.",
@@ -132,6 +135,14 @@ export default async function AdminProductDetailPage({
   const notice =
     typeof query.notice === "string" ? notices[query.notice] : undefined;
 
+  const sections = [
+    { href: "#info", label: "Məlumat" },
+    { href: "#prices", label: "Qiymət və stok" },
+    { href: "#images", label: `Şəkillər (${images.length})` },
+    { href: "#videos", label: `Video (${videos.length})` },
+    { href: "#status", label: "Status" },
+  ];
+
   return (
     <>
       <Link
@@ -147,41 +158,29 @@ export default async function AdminProductDetailPage({
         title={product.name}
         description={`SKU: ${product.sku}`}
         actions={
-          <div className="flex flex-wrap items-center gap-3">
-            {product.active ? (
-              <Badge tone="green">Aktiv</Badge>
-            ) : (
-              <Badge tone="red">Deaktiv</Badge>
-            )}
-
-            <ActionForm
-              action={updateProductActive}
-              className="flex flex-col items-end"
-              confirmMessage={
-                product.active
-                  ? "Məhsul satışdan çıxarılsın? Müştərilər onu görməyəcək."
-                  : undefined
-              }
-            >
-              <input type="hidden" name="productId" value={product.id} />
-              <input
-                type="hidden"
-                name="active"
-                value={product.active ? "false" : "true"}
-              />
-              <SubmitButton
-                className={`btn ${product.active ? "btn-danger" : "btn-success"}`}
-              >
-                {product.active ? "Deaktiv et" : "Aktiv et"}
-              </SubmitButton>
-            </ActionForm>
-          </div>
+          product.active ? (
+            <Badge tone="green">Aktiv · satışda</Badge>
+          ) : (
+            <Badge tone="red">Deaktiv · gizli</Badge>
+          )
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <section className="card p-5 sm:p-6">
-          <h2 className="mb-4 font-semibold text-white">Əsas məlumatlar</h2>
+      <nav aria-label="Bölmələr" className="mb-6 flex flex-wrap gap-2">
+        {sections.map((section) => (
+          <a
+            key={section.href}
+            href={section.href}
+            className="rounded-full border border-zinc-700 px-3 py-1 text-sm text-zinc-300 hover:border-amber-500 hover:text-amber-300"
+          >
+            {section.label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section id="info" className="card scroll-mt-20 p-4 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold text-white">Məlumat</h2>
 
           <ActionForm action={updateProductContent} className="space-y-4">
             <input type="hidden" name="productId" value={product.id} />
@@ -211,7 +210,7 @@ export default async function AdminProductDetailPage({
                 </option>
                 {(categories ?? []).map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.path}
+                    {`${"   ".repeat(category.depth)}${category.depth > 0 ? "└ " : ""}${category.name}`}
                     {category.available ? "" : " (deaktiv)"}
                   </option>
                 ))}
@@ -239,22 +238,36 @@ export default async function AdminProductDetailPage({
           </ActionForm>
         </section>
 
-        <section className="card p-5 sm:p-6">
-          <h2 className="mb-4 font-semibold text-white">Stok və qiymətlər</h2>
+        <section id="prices" className="card scroll-mt-20 p-4 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold text-white">Qiymət və stok</h2>
 
           <ActionForm action={updateProduct} className="space-y-4">
             <input type="hidden" name="productId" value={product.id} />
 
-            <PriceFields
-              stock={product.stock}
-              normalPrice={product.normal_price}
-              dealerPrice={product.dealer_price}
-              vipPrice={product.vip_price}
+            <PriceBoxes
+              defaults={{
+                normal: product.normal_price,
+                dealer: product.dealer_price,
+                vip: product.vip_price,
+              }}
             />
 
+            <Field label="Stok miqdarı *" htmlFor="stock">
+              <input
+                id="stock"
+                type="number"
+                name="stock"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                required
+                defaultValue={product.stock}
+                className="input text-lg"
+              />
+            </Field>
+
             <p className="text-xs text-zinc-500">
-              Müştəri yalnız öz qiymət qrupunun qiymətini görür. Qiymət
-              serverdə müştərinin qrupuna görə seçilir.
+              Müştəri yalnız öz qrupunun qiymətini görür.
             </p>
 
             <SubmitButton pendingText="Yadda saxlanılır...">
@@ -264,10 +277,10 @@ export default async function AdminProductDetailPage({
         </section>
       </div>
 
-      <section className="card mt-6 p-5 sm:p-6">
-        <h2 className="font-semibold text-white">Şəkillər</h2>
+      <section id="images" className="card mt-6 scroll-mt-20 p-4 sm:p-6">
+        <h2 className="text-lg font-semibold text-white">Şəkillər</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Əsas şəkil kataloqda göstərilir. JPG, PNG və ya WEBP, maksimum 5 MB.
+          Əsas şəkil kataloqda göstərilir.
         </p>
 
         {images.length > 0 ? (
@@ -278,11 +291,11 @@ export default async function AdminProductDetailPage({
               return (
                 <li
                   key={image.id}
-                  className={`overflow-hidden rounded-lg border bg-zinc-950 ${
+                  className={`overflow-hidden rounded-lg border-2 bg-zinc-950 ${
                     image.is_primary ? "border-amber-500" : "border-zinc-800"
                   }`}
                 >
-                  <div className="aspect-square">
+                  <div className="relative aspect-square">
                     {imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -296,17 +309,20 @@ export default async function AdminProductDetailPage({
                         Önizləmə yoxdur
                       </span>
                     )}
+                    {image.is_primary && (
+                      <span className="absolute top-1 left-1 rounded bg-amber-500 px-2 py-0.5 text-xs font-bold text-zinc-950">
+                        Əsas şəkil
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-2 border-t border-zinc-800 p-2">
-                    {image.is_primary ? (
-                      <Badge tone="amber">Əsas şəkil</Badge>
-                    ) : (
+                    {!image.is_primary && (
                       <ActionForm action={setProductPrimaryImage} hideSuccess>
                         <input type="hidden" name="mediaId" value={image.id} />
                         <input type="hidden" name="productId" value={product.id} />
                         <SubmitButton className="btn btn-secondary btn-sm w-full">
-                          Əsas et
+                          Əsas şəkil et
                         </SubmitButton>
                       </ActionForm>
                     )}
@@ -334,81 +350,115 @@ export default async function AdminProductDetailPage({
           <p className="mt-4 text-sm text-zinc-500">Hələ şəkil yoxdur.</p>
         )}
 
-        <ActionForm
-          action={uploadProductImage}
-          resetOnSuccess
-          className="mt-5 flex flex-wrap items-end gap-3 border-t border-zinc-800 pt-5"
-        >
-          <input type="hidden" name="productId" value={product.id} />
-
-          <ImageFileInput />
-
-          <SubmitButton pendingText="Yüklənir...">Şəkil yüklə</SubmitButton>
-        </ActionForm>
-      </section>
-
-      <section className="card mt-6 p-5 sm:p-6">
-        <h2 className="font-semibold text-white">Videolar</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          MP4 və ya WEBM, maksimum 50 MB.
-        </p>
-
-        {videos.length > 0 ? (
-          <ul className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {videos.map((video) => {
-              const videoUrl = urls.get(video.storage_path);
-
-              return (
-                <li key={video.id} className="rounded-lg border border-zinc-800 p-3">
-                  {videoUrl ? (
-                    <video
-                      src={videoUrl}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="aspect-video w-full rounded bg-black"
-                    />
-                  ) : (
-                    <p className="text-sm text-zinc-500">Önizləmə yoxdur</p>
-                  )}
-
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-sm text-zinc-400">
-                      {video.original_name ?? "Video"}
-                    </p>
-
-                    <ActionForm
-                      action={deleteProductVideo}
-                      hideSuccess
-                      confirmMessage="Bu video silinsin? Bu əməliyyat geri qaytarılmır."
-                    >
-                      <input type="hidden" name="mediaId" value={video.id} />
-                      <input type="hidden" name="productId" value={product.id} />
-                      <SubmitButton
-                        className="btn btn-danger btn-sm"
-                        pendingText="Silinir..."
-                      >
-                        Sil
-                      </SubmitButton>
-                    </ActionForm>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="mt-4 text-sm text-zinc-500">Hələ video yoxdur.</p>
-        )}
-
         <div className="mt-5 border-t border-zinc-800 pt-5">
-          <ProductVideoUpload productId={product.id} />
+          <ProductImageUploader productId={product.id} />
         </div>
       </section>
 
-      <p className="mt-6 text-xs text-zinc-500">
-        Məhsullar sifariş tarixçəsini qorumaq üçün silinmir. Satışdan
-        çıxarmaq üçün “Deaktiv et” istifadə edin.
-      </p>
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section id="videos" className="card scroll-mt-20 p-4 sm:p-6">
+          <h2 className="text-lg font-semibold text-white">Video</h2>
+
+          {videos.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {videos.map((video) => {
+                const videoUrl = urls.get(video.storage_path);
+
+                return (
+                  <li key={video.id} className="rounded-lg border border-zinc-800 p-3">
+                    {videoUrl ? (
+                      <video
+                        src={videoUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="aspect-video w-full rounded bg-black"
+                      />
+                    ) : (
+                      <p className="text-sm text-zinc-500">Önizləmə yoxdur</p>
+                    )}
+
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-sm text-zinc-400">
+                        {video.original_name ?? "Video"}
+                      </p>
+
+                      <ActionForm
+                        action={deleteProductVideo}
+                        hideSuccess
+                        confirmMessage="Bu video silinsin? Bu əməliyyat geri qaytarılmır."
+                      >
+                        <input type="hidden" name="mediaId" value={video.id} />
+                        <input type="hidden" name="productId" value={product.id} />
+                        <SubmitButton
+                          className="btn btn-danger btn-sm"
+                          pendingText="Silinir..."
+                        >
+                          Sil
+                        </SubmitButton>
+                      </ActionForm>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-zinc-500">Hələ video yoxdur.</p>
+          )}
+
+          <div className="mt-5 border-t border-zinc-800 pt-5">
+            <ProductVideoUpload productId={product.id} />
+          </div>
+        </section>
+
+        <section id="status" className="card scroll-mt-20 space-y-4 p-4 sm:p-6">
+          <h2 className="text-lg font-semibold text-white">Status</h2>
+
+          <div
+            className={`rounded-lg border-2 p-4 ${
+              product.active
+                ? "border-emerald-700 bg-emerald-950/30"
+                : "border-zinc-700 bg-zinc-900"
+            }`}
+          >
+            <p className={`text-lg font-bold ${product.active ? "text-emerald-300" : "text-zinc-200"}`}>
+              {product.active ? "Aktiv · satışda" : "Deaktiv · gizli"}
+            </p>
+            <p className="mt-1 text-sm text-zinc-400">
+              {product.active
+                ? "Müştərilər bu məhsulu kataloqda görür və sifariş edə bilir."
+                : "Müştərilər bu məhsulu görmür."}
+            </p>
+          </div>
+
+          <ActionForm
+            action={updateProductActive}
+            confirmMessage={
+              product.active
+                ? "Məhsul satışdan çıxarılsın? Müştərilər onu görməyəcək."
+                : undefined
+            }
+          >
+            <input type="hidden" name="productId" value={product.id} />
+            <input
+              type="hidden"
+              name="active"
+              value={product.active ? "false" : "true"}
+            />
+            <SubmitButton
+              className={`btn w-full ${product.active ? "btn-danger" : "btn-success"}`}
+            >
+              {product.active ? "Deaktiv et (satışdan çıxar)" : "Aktiv et (satışa çıxar)"}
+            </SubmitButton>
+          </ActionForm>
+
+          <p className="text-xs text-zinc-500">
+            Məhsullar sifariş tarixçəsini qorumaq üçün silinmir. Satışdan
+            çıxarmaq üçün “Deaktiv et” istifadə edin.
+          </p>
+        </section>
+      </div>
     </>
   );
 }
+

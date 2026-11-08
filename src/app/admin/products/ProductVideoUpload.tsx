@@ -1,147 +1,110 @@
 "use client";
 
-import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 
-import { createClient } from "@/lib/supabase/client";
+import MediaDropZone from "./MediaDropZone";
+import { formatFileSize, uploadVideoFile, videoAccept, videoProblem } from "./media-upload";
 
-import { registerProductVideo } from "./actions";
+type Picked = { file: File; url: string };
 
-type ProductVideoUploadProps = {
-  productId: string;
-};
-
-const extensionByMimeType: Record<string, string> = {
-  "video/mp4": "mp4",
-  "video/webm": "webm",
-};
-
-const maxVideoSize = 50 * 1024 * 1024;
-
-export default function ProductVideoUpload({
-  productId,
-}: ProductVideoUploadProps) {
+export default function ProductVideoUpload({ productId }: { productId: string }) {
   const router = useRouter();
-
+  const busy = useRef(false);
+  const [picked, setPicked] = useState<Picked | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<{
-    ok: boolean;
-    text: string;
-  } | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function choose(files: File[]) {
+    const file = files[0];
+    const problem = videoProblem(file);
 
-    if (uploading) {
+    if (picked) URL.revokeObjectURL(picked.url);
+
+    if (problem) {
+      setPicked(null);
+      setMessage({ ok: false, text: `${file.name}: ${problem}` });
       return;
     }
 
-    const form = event.currentTarget;
-    const videoValue = new FormData(form).get("video");
+    setMessage(null);
+    setPicked({ file, url: URL.createObjectURL(file) });
+  }
 
-    if (!(videoValue instanceof File) || videoValue.size === 0) {
-      setMessage({ ok: false, text: "Video seçin." });
+  function clear() {
+    if (picked) URL.revokeObjectURL(picked.url);
+    setPicked(null);
+  }
+
+  async function upload() {
+    if (busy.current || !picked) {
       return;
     }
 
-    const extension = extensionByMimeType[videoValue.type];
-
-    if (!extension) {
-      setMessage({
-        ok: false,
-        text: "Yalnız MP4 və ya WEBM video yükləmək olar.",
-      });
-      return;
-    }
-
-    if (videoValue.size > maxVideoSize) {
-      setMessage({
-        ok: false,
-        text: "Videonun həcmi 50 MB-dan çox ola bilməz.",
-      });
-      return;
-    }
-
+    busy.current = true;
     setUploading(true);
     setMessage(null);
 
-    const storagePath = `${productId}/${crypto.randomUUID()}.${extension}`;
+    const result = await uploadVideoFile(productId, picked.file);
 
-    const supabase = createClient();
-
-    const { error: uploadError } = await supabase.storage
-      .from("product-media")
-      .upload(storagePath, videoValue, {
-        contentType: videoValue.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      setUploading(false);
-      setMessage({ ok: false, text: "Video yaddaşa yüklənmədi." });
-      return;
-    }
-
-    try {
-      const registerFormData = new FormData();
-
-      registerFormData.set("productId", productId);
-      registerFormData.set("storagePath", storagePath);
-      registerFormData.set("originalName", videoValue.name);
-      registerFormData.set("mimeType", videoValue.type);
-
-      await registerProductVideo(registerFormData);
-
-      form.reset();
-      setMessage({ ok: true, text: "Video yükləndi." });
+    if (result?.ok) {
+      clear();
       router.refresh();
-    } catch {
-      setMessage({
-        ok: false,
-        text: "Video yükləndi, lakin məhsula bağlanmadı. Yenidən cəhd edin.",
-      });
-    } finally {
-      setUploading(false);
     }
+
+    setMessage({ ok: Boolean(result?.ok), text: result?.message ?? "Video yüklənmədi." });
+    setUploading(false);
+    busy.current = false;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
-      <div className="min-w-0 flex-1">
-        <label htmlFor={`video-${productId}`} className="label">
-          Yeni video
-        </label>
-
-        <input
-          id={`video-${productId}`}
-          type="file"
-          name="video"
-          accept="video/mp4,video/webm"
-          required
-          disabled={uploading}
-          className="input file:mr-3 file:rounded file:border-0 file:bg-zinc-800 file:px-3 file:py-1 file:text-zinc-200"
-        />
-      </div>
-
-      <button
-        type="submit"
+    <div className="space-y-3">
+      <MediaDropZone
+        id={`video-${productId}`}
+        title="Video əlavə et"
+        hint="MP4 və ya WEBM · maksimum 50 MB."
+        accept={videoAccept}
         disabled={uploading}
-        aria-busy={uploading}
-        className="btn btn-primary"
-      >
-        {uploading ? "Yüklənir..." : "Video yüklə"}
-      </button>
+        onFiles={choose}
+      />
+
+      {picked && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 p-2">
+          <video
+            src={picked.url}
+            muted
+            playsInline
+            preload="metadata"
+            className="h-16 w-24 shrink-0 rounded bg-black object-cover"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-zinc-200" title={picked.file.name}>
+              {picked.file.name}
+            </p>
+            <p className="text-xs text-zinc-500">{formatFileSize(picked.file.size)}</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" disabled={uploading} onClick={clear} className="btn btn-secondary btn-sm">
+              Ləğv et
+            </button>
+            <button
+              type="button"
+              disabled={uploading}
+              aria-busy={uploading}
+              onClick={upload}
+              className="btn btn-primary btn-sm"
+            >
+              {uploading ? "Yüklənir..." : "Videonu yüklə"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {message && (
-        <p
-          role={message.ok ? "status" : "alert"}
-          className={`basis-full text-sm ${
-            message.ok ? "text-emerald-400" : "text-red-400"
-          }`}
-        >
+        <p role={message.ok ? "status" : "alert"} className={`text-sm ${message.ok ? "text-emerald-400" : "text-red-400"}`}>
           {message.text}
         </p>
       )}
-    </form>
+    </div>
   );
 }

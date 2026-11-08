@@ -80,46 +80,51 @@ function parseStockAndPrices(formData: FormData) {
   };
 }
 
-export async function createProduct(
-  _state: ActionResult,
+export type CreateProductDraftResult =
+  | { ok: true; productId: string; contentSaved: boolean }
+  | { ok: false; message: string };
+
+// Step 1 of the visual create screen: the product is always created
+// INACTIVE. The browser then uploads images and videos and only activates
+// the product when everything succeeded and the user chose "Aktiv".
+export async function createProductDraft(
   formData: FormData
-): Promise<ActionResult> {
+): Promise<CreateProductDraftResult> {
   const sku = readText(formData, "sku");
   const name = readText(formData, "name");
   const description = readText(formData, "description") ?? "";
   const categoryId = readText(formData, "categoryId");
-  const activeValue = readText(formData, "active");
   const numbers = parseStockAndPrices(formData);
 
   if (!sku || !name || !categoryId) {
-    return fail("Ad, SKU və kateqoriya mütləqdir.");
+    return { ok: false, message: "Ad, SKU və kateqoriya mütləqdir." };
+  }
+
+  if (!uuidPattern.test(categoryId)) {
+    return { ok: false, message: "Kateqoriya seçin." };
   }
 
   if (!numbers) {
-    return fail("Stok tam ədəd, qiymətlər isə 0 və ya daha böyük olmalıdır.");
-  }
-
-  if (activeValue !== "true" && activeValue !== "false") {
-    return fail("Status yanlışdır.");
+    return {
+      ok: false,
+      message: "Stok tam ədəd, qiymətlər isə 0 və ya daha böyük olmalıdır.",
+    };
   }
 
   const supabase = await getAuthedClient();
 
-  const { data: productId, error } = await supabase.rpc(
-    "create_admin_product",
-    {
-      p_sku: sku,
-      p_category_id: categoryId,
-      p_stock: numbers.stock,
-      p_normal_price: numbers.normalPrice,
-      p_dealer_price: numbers.dealerPrice,
-      p_vip_price: numbers.vipPrice,
-      p_active: activeValue === "true",
-    }
-  );
+  const { data: productId, error } = await supabase.rpc("create_admin_product", {
+    p_sku: sku,
+    p_category_id: categoryId,
+    p_stock: numbers.stock,
+    p_normal_price: numbers.normalPrice,
+    p_dealer_price: numbers.dealerPrice,
+    p_vip_price: numbers.vipPrice,
+    p_active: false,
+  });
 
   if (error || !productId) {
-    return fail(dbErrorMessage(error, "Məhsul yaradılmadı."));
+    return { ok: false, message: dbErrorMessage(error, "Məhsul yaradılmadı.") };
   }
 
   const { error: contentError } = await supabase.rpc(
@@ -134,11 +139,7 @@ export async function createProduct(
 
   revalidateProductPaths(productId);
 
-  if (contentError) {
-    redirect(`/admin/products/${productId}?notice=content-failed`);
-  }
-
-  redirect(`/admin/products/${productId}?notice=created`);
+  return { ok: true, productId, contentSaved: !contentError };
 }
 
 export async function updateProduct(

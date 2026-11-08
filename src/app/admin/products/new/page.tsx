@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import ActionForm from "@/components/ActionForm";
-import SubmitButton from "@/components/SubmitButton";
-import { Alert, EmptyState, Field, PageHeader } from "@/components/ui";
+import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 
-import { createProduct } from "../actions";
-import PriceFields from "../PriceFields";
+import ProductCreateForm from "./ProductCreateForm";
 
 export const metadata: Metadata = {
   title: "Yeni məhsul",
@@ -31,7 +28,7 @@ export default async function NewProductPage() {
 
       <PageHeader
         title="Yeni məhsul"
-        description="Şəkil və videoları məhsul yaradıldıqdan sonra əlavə edə bilərsiniz."
+        description="Məlumatı, qiymətləri, şəkil və videonu doldurun, sonra “Məhsulu yarat” düyməsini basın."
       />
 
       {error && <Alert>Kateqoriyalar yüklənmədi.</Alert>}
@@ -47,50 +44,15 @@ export default async function NewProductPage() {
           }
         />
       ) : (
-        <ActionForm action={createProduct} className="card max-w-3xl space-y-5 p-5 sm:p-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Məhsul adı *" htmlFor="name">
-              <input id="name" name="name" required maxLength={200} className="input" />
-            </Field>
-
-            <Field label="SKU *" htmlFor="sku" hint="Unikal məhsul kodu, məs. LED-H4-001">
-              <input id="sku" name="sku" required maxLength={64} className="input font-mono" />
-            </Field>
-          </div>
-
-          <Field label="Təsvir" htmlFor="description">
-            <textarea id="description" name="description" rows={4} maxLength={5000} className="input" />
-          </Field>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Kateqoriya *" htmlFor="categoryId">
-              <select id="categoryId" name="categoryId" required defaultValue="" className="input">
-                <option value="" disabled>
-                  Kateqoriya seçin
-                </option>
-                {(categories ?? []).map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.path}
-                    {category.available ? "" : " (deaktiv)"}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Status" htmlFor="active">
-              <select id="active" name="active" defaultValue="true" className="input">
-                <option value="true">Aktiv (satışda)</option>
-                <option value="false">Deaktiv (gizli)</option>
-              </select>
-            </Field>
-          </div>
-
-          <PriceFields />
-
-          <div className="flex justify-end border-t border-zinc-800 pt-5">
-            <SubmitButton pendingText="Yaradılır...">Məhsulu yarat</SubmitButton>
-          </div>
-        </ActionForm>
+        <ProductCreateForm
+          categories={(categories ?? []).map((category) => ({
+            id: category.id,
+            name: category.name,
+            path: category.path,
+            depth: category.depth,
+            available: category.available,
+          }))}
+        />
       )}
     </>
   );
