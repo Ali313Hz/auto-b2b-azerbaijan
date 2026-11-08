@@ -25,7 +25,7 @@ export default async function Home() {
     redirect("/change-password");
   }
 
-  if (staff?.active && staff.role === "OWNER") {
+  if (staff?.active) {
     redirect("/admin");
   }
 

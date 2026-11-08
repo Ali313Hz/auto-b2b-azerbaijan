@@ -6,7 +6,8 @@ import ActionForm from "@/components/ActionForm";
 import PasswordResetForm from "@/components/PasswordResetForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, Field, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import {
   formatAzn,
   formatDate,
@@ -39,13 +40,18 @@ export default async function AdminCustomerDetailPage({
   searchParams,
 }: PageProps<"/admin/customers/[id]">) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const { supabase } = await requireOwner();
+  const { supabase, role } = await requireStaff("customersView");
+  const isOwner = can(role, "owner");
+  const canEdit = can(role, "customersEdit");
 
   const [{ data: customers }, { data: orders }, { data: loginRows }] =
     await Promise.all([
       supabase.rpc("get_admin_customers"),
       supabase.rpc("get_admin_orders"),
-      supabase.rpc("get_admin_customer_login", { p_customer_id: id }),
+      // Login and password details are OWNER-only (also in the database).
+      isOwner
+        ? supabase.rpc("get_admin_customer_login", { p_customer_id: id })
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
   const customer = customers?.find((item) => item.id === id);
@@ -112,7 +118,7 @@ export default async function AdminCustomerDetailPage({
                 name="companyName"
                 required
                 maxLength={200}
-                disabled={isArchived}
+                disabled={isArchived || !canEdit}
                 defaultValue={customer.company_name ?? ""}
                 className="input"
               />
@@ -124,7 +130,7 @@ export default async function AdminCustomerDetailPage({
                 name="contactName"
                 required
                 maxLength={200}
-                disabled={isArchived}
+                disabled={isArchived || !canEdit}
                 defaultValue={customer.contact_name ?? ""}
                 className="input"
               />
@@ -136,13 +142,13 @@ export default async function AdminCustomerDetailPage({
                 type="tel"
                 name="phone"
                 maxLength={40}
-                disabled={isArchived}
+                disabled={isArchived || !canEdit}
                 defaultValue={customer.phone ?? ""}
                 className="input"
               />
             </Field>
 
-            {!isArchived && (
+            {!isArchived && canEdit && (
               <SubmitButton pendingText="Yadda saxlanılır...">
                 Yadda saxla
               </SubmitButton>
@@ -159,6 +165,12 @@ export default async function AdminCustomerDetailPage({
             {isArchived ? (
               <p className="text-sm text-zinc-500">
                 Arxivdəki müştəri üçün dəyişiklik edilə bilməz.
+              </p>
+            ) : !canEdit ? (
+              <p className="text-sm text-zinc-400">
+                Qiymət qrupu: {priceGroupLabels[customer.price_group]} · Status:{" "}
+                {customer.active ? "Aktiv" : "Deaktiv"}. Rolunuz yalnız baxmağa
+                icazə verir.
               </p>
             ) : (
               <div className="space-y-4">
@@ -214,6 +226,7 @@ export default async function AdminCustomerDetailPage({
             )}
           </section>
 
+          {isOwner && (
           <section className="card p-5 sm:p-6">
             <h2 className="font-semibold text-white">Giriş və şifrə</h2>
             <p className="mt-1 mb-4 text-sm text-zinc-400">
@@ -298,8 +311,9 @@ export default async function AdminCustomerDetailPage({
               </div>
             )}
           </section>
+          )}
 
-          {!isArchived && (
+          {!isArchived && isOwner && (
             <section className="card p-5 sm:p-6">
               <h2 className="font-semibold text-white">İki mərhələli təsdiq (2FA)</h2>
               <p className="mt-1 mb-4 text-sm text-zinc-400">
@@ -369,6 +383,7 @@ export default async function AdminCustomerDetailPage({
         )}
       </section>
 
+      {isOwner && (
       <section className="card mt-6 border-red-900/50 p-5 sm:p-6">
         <h2 className="font-semibold text-white">Arxiv və silmə</h2>
 
@@ -413,6 +428,7 @@ export default async function AdminCustomerDetailPage({
           </>
         )}
       </section>
+      )}
     </>
   );
 }

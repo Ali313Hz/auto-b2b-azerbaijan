@@ -4,7 +4,7 @@ import Link from "next/link";
 import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, EmptyState, Field, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 
 import { createProduct } from "../actions";
 import PriceFields from "../PriceFields";
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function NewProductPage() {
-  const { supabase } = await requireOwner();
+  const { supabase } = await requireStaff("productsEdit");
 
   const { data: categories, error } = await supabase.rpc(
     "get_admin_categories"

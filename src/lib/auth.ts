@@ -4,6 +4,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import { MFA_REQUIRED } from "@/lib/mfa";
+import { type Access, can } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 
 // Deduplicated per request so layouts and pages share one auth lookup.
@@ -80,7 +81,9 @@ function enforceAccountState(session: Session) {
   }
 }
 
-export async function requireOwner() {
+// Active staff member allowed into the given admin area. The database
+// checks the same role lists in every RPC; this keeps pages consistent.
+export async function requireStaff(area: Access = "dashboard") {
   const session = await getSession();
 
   if (!session.user) {
@@ -95,11 +98,19 @@ export async function requireOwner() {
 
   const { staff } = session;
 
-  if (!staff || !staff.active || staff.role !== "OWNER") {
+  if (!staff || !staff.active) {
     redirect("/");
   }
 
-  return { ...session, user: session.user, staff };
+  if (!can(staff.role, area)) {
+    redirect(area === "dashboard" ? "/" : "/admin?notice=forbidden");
+  }
+
+  return { ...session, user: session.user, staff, role: staff.role };
+}
+
+export async function requireOwner() {
+  return requireStaff("owner");
 }
 
 export async function requireCustomer() {
@@ -115,7 +126,7 @@ export async function requireCustomer() {
 
   enforceAccountState(session);
 
-  if (session.staff?.active && session.staff.role === "OWNER") {
+  if (session.staff?.active) {
     redirect("/admin");
   }
 

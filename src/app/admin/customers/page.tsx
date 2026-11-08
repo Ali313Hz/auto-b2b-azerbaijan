@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { priceGroupLabels } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -25,7 +26,8 @@ export default async function AdminCustomersPage({
   const statusFilter =
     typeof params.status === "string" ? params.status : "";
 
-  const { supabase } = await requireOwner();
+  const { supabase, role } = await requireStaff("customersView");
+  const isOwner = can(role, "owner");
 
   const { data: customers, error } = await supabase.rpc(
     "get_admin_customers"
@@ -70,9 +72,11 @@ export default async function AdminCustomersPage({
         title="Müştərilər"
         description={`${allCustomers.length} müştəri`}
         actions={
-          <Link href="/admin/customers/new" className="btn btn-primary">
-            + Yeni müştəri
-          </Link>
+          isOwner ? (
+            <Link href="/admin/customers/new" className="btn btn-primary">
+              + Yeni müştəri
+            </Link>
+          ) : undefined
         }
       />
 
@@ -125,7 +129,7 @@ export default async function AdminCustomersPage({
               : "Uyğun müştəri tapılmadı"
           }
           action={
-            allCustomers.length === 0 ? (
+            allCustomers.length === 0 && isOwner ? (
               <Link href="/admin/customers/new" className="btn btn-primary">
                 İlk müştərini yarat
               </Link>

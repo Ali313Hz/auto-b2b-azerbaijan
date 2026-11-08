@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import {
   formatAzn,
   formatDate,
@@ -30,7 +30,7 @@ export default async function AdminOrdersPage({
   const statusFilter =
     typeof params.status === "string" ? params.status : "";
 
-  const { supabase } = await requireOwner();
+  const { supabase } = await requireStaff("ordersView");
 
   const { data: orders, error } = await supabase.rpc("get_admin_orders");
 

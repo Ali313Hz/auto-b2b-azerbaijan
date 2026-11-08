@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import {
   formatAzn,
   formatDate,
@@ -25,7 +26,8 @@ export default async function AdminOrderDetailPage({
   params,
 }: PageProps<"/admin/orders/[id]">) {
   const { id } = await params;
-  const { supabase } = await requireOwner();
+  const { supabase, role } = await requireStaff("ordersView");
+  const canProcess = can(role, "ordersProcess");
 
   const [{ data: orders }, { data: items, error: itemsError }] =
     await Promise.all([
@@ -135,7 +137,7 @@ export default async function AdminOrderDetailPage({
               Status
             </h2>
 
-            {order.status === "PENDING" ? (
+            {order.status === "PENDING" && canProcess ? (
               <div className="mt-3 space-y-3">
                 <ActionForm action={updateOrderStatus}>
                   <input type="hidden" name="orderId" value={order.order_id} />
@@ -164,8 +166,10 @@ export default async function AdminOrderDetailPage({
               </div>
             ) : (
               <p className="mt-3 text-sm text-zinc-400">
-                Son yenilənmə: {formatDate(order.updated_at)}. Yalnız gözləyən
-                sifarişlərin statusu dəyişdirilə bilər.
+                Son yenilənmə: {formatDate(order.updated_at)}.{" "}
+                {canProcess
+                  ? "Yalnız gözləyən sifarişlərin statusu dəyişdirilə bilər."
+                  : "Rolunuz yalnız baxmağa icazə verir."}
               </p>
             )}
           </section>

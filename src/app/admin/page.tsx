@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import {
   formatAzn,
   formatDate,
@@ -9,22 +9,35 @@ import {
   orderStatusTones,
   shortId,
 } from "@/lib/format";
+import { can } from "@/lib/roles";
 
 const LOW_STOCK_THRESHOLD = 5;
 
-export default async function AdminPage() {
-  const { supabase } = await requireOwner();
+const empty = { data: null, error: null };
 
-  // Counts come from one aggregate RPC; only the rows shown are fetched.
+export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
+  const [{ supabase, role }, query] = await Promise.all([
+    requireStaff(),
+    searchParams,
+  ]);
+
+  const showOrders = can(role, "ordersView");
+  const showProducts = can(role, "productsView");
+  const showCustomers = can(role, "customersView");
+
+  // Counts come from one aggregate RPC; only the rows shown are fetched,
+  // and only the sections this role may see.
   const [ordersResult, statsResult, lowStockResult] = await Promise.all([
-    supabase.rpc("get_admin_orders"),
+    showOrders ? supabase.rpc("get_admin_orders") : empty,
     supabase.rpc("get_admin_dashboard_stats"),
-    supabase.rpc("get_admin_products_page", {
-      p_page: 1,
-      p_page_size: 6,
-      p_low_stock: true,
-      p_sort: "stock",
-    }),
+    showProducts
+      ? supabase.rpc("get_admin_products_page", {
+          p_page: 1,
+          p_page_size: 6,
+          p_low_stock: true,
+          p_sort: "stock",
+        })
+      : empty,
   ]);
 
   const orders = ordersResult.data ?? [];
@@ -37,29 +50,29 @@ export default async function AdminPage() {
   const lowStockCount = counts?.low_stock_products ?? 0;
 
   const stats = [
-    {
+    showOrders && {
       label: "Gözləyən sifarişlər",
       value: pendingOrders.length,
       href: "/admin/orders?status=PENDING",
       highlight: pendingOrders.length > 0,
     },
-    {
+    showProducts && {
       label: "Aktiv məhsullar",
       value: `${counts?.active_products ?? 0} / ${counts?.total_products ?? 0}`,
       href: "/admin/products",
     },
-    {
+    showProducts && {
       label: "Az stoklu məhsullar",
       value: lowStockCount,
       href: "/admin/products?stock=low",
       highlight: lowStockCount > 0,
     },
-    {
+    showCustomers && {
       label: "Aktiv müştərilər",
       value: counts?.active_customers ?? 0,
       href: "/admin/customers",
     },
-  ];
+  ].filter((stat) => !!stat);
 
   return (
     <>
@@ -67,6 +80,10 @@ export default async function AdminPage() {
         title="İdarə paneli"
         description="Sifarişlər, məhsullar və müştərilər üzrə qısa baxış."
       />
+
+      {query.notice === "forbidden" && (
+        <Alert tone="amber">Bu bölmə üçün rolunuzun icazəsi yoxdur.</Alert>
+      )}
 
       {hasError && (
         <Alert>Bəzi məlumatlar yüklənmədi. Səhifəni yeniləyin.</Alert>
@@ -92,6 +109,7 @@ export default async function AdminPage() {
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {showOrders && (
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold text-white">Gözləyən sifarişlər</h2>
@@ -137,7 +155,9 @@ export default async function AdminPage() {
             </ul>
           )}
         </section>
+        )}
 
+        {showProducts && (
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold text-white">
@@ -179,6 +199,7 @@ export default async function AdminPage() {
             </ul>
           )}
         </section>
+        )}
       </div>
     </>
   );

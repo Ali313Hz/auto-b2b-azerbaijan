@@ -3,7 +3,8 @@ import Link from "next/link";
 
 import Pagination from "@/components/Pagination";
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { formatAzn, readPage, uuidPattern } from "@/lib/format";
 
 const PAGE_SIZE = 50;
@@ -28,7 +29,8 @@ export default async function AdminProductsPage({
   const lowStockOnly = params.stock === "low";
   const page = readPage(params.page);
 
-  const { supabase } = await requireOwner();
+  const { supabase, role } = await requireStaff("productsView");
+  const canEdit = can(role, "productsEdit");
 
   // One page per request; filtering, search and counting run in the database.
   const [{ data: products, error }, { data: categories }] = await Promise.all([
@@ -66,9 +68,11 @@ export default async function AdminProductsPage({
         title="Məhsullar"
         description={hasFilters ? `${total} uyğun məhsul` : `${total} məhsul`}
         actions={
-          <Link href="/admin/products/new" className="btn btn-primary">
-            + Yeni məhsul
-          </Link>
+          canEdit ? (
+            <Link href="/admin/products/new" className="btn btn-primary">
+              + Yeni məhsul
+            </Link>
+          ) : undefined
         }
       />
 
@@ -147,7 +151,7 @@ export default async function AdminProductsPage({
         <EmptyState
           title={hasFilters ? "Uyğun məhsul tapılmadı" : "Hələ məhsul yoxdur"}
           action={
-            hasFilters ? undefined : (
+            hasFilters || !canEdit ? undefined : (
               <Link href="/admin/products/new" className="btn btn-primary">
                 İlk məhsulu yarat
               </Link>
@@ -162,9 +166,13 @@ export default async function AdminProductsPage({
                 <th>Məhsul</th>
                 <th>Kateqoriya</th>
                 <th className="text-right">Stok</th>
-                <th className="text-right">Normal</th>
-                <th className="text-right">Diler</th>
-                <th className="text-right">VIP</th>
+                {canEdit && (
+                  <>
+                    <th className="text-right">Normal</th>
+                    <th className="text-right">Diler</th>
+                    <th className="text-right">VIP</th>
+                  </>
+                )}
                 <th>Status</th>
                 <th className="sr-only">Əməliyyat</th>
               </tr>
@@ -200,15 +208,19 @@ export default async function AdminProductsPage({
                       {product.stock}
                     </span>
                   </td>
-                  <td className="text-right whitespace-nowrap">
-                    {formatAzn(product.normal_price)}
-                  </td>
-                  <td className="text-right whitespace-nowrap">
-                    {formatAzn(product.dealer_price)}
-                  </td>
-                  <td className="text-right whitespace-nowrap">
-                    {formatAzn(product.vip_price)}
-                  </td>
+                  {canEdit && (
+                    <>
+                      <td className="text-right whitespace-nowrap">
+                        {formatAzn(product.normal_price)}
+                      </td>
+                      <td className="text-right whitespace-nowrap">
+                        {formatAzn(product.dealer_price)}
+                      </td>
+                      <td className="text-right whitespace-nowrap">
+                        {formatAzn(product.vip_price)}
+                      </td>
+                    </>
+                  )}
                   <td>
                     {product.active ? (
                       <Badge tone="green">Aktiv</Badge>
@@ -221,7 +233,7 @@ export default async function AdminProductsPage({
                       href={`/admin/products/${product.id}`}
                       className="btn btn-secondary btn-sm"
                     >
-                      Redaktə
+                      {canEdit ? "Redaktə" : "Stok"}
                     </Link>
                   </td>
                 </tr>

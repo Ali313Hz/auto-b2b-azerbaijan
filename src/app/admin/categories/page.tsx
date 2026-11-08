@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, EmptyState, Field, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 
 import { createCategory, updateCategory } from "./actions";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 const indentClasses = ["", "border-l-4 border-l-zinc-700 sm:ml-6", "border-l-4 border-l-zinc-700 sm:ml-12"];
 
 export default async function AdminCategoriesPage() {
-  const { supabase } = await requireOwner();
+  const { supabase } = await requireStaff("categories");
 
   const { data: categories, error } = await supabase.rpc("get_admin_categories");
 

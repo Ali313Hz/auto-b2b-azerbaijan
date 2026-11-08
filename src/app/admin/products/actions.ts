@@ -175,6 +175,38 @@ export async function updateProduct(
   return ok("Stok və qiymətlər yadda saxlandı.");
 }
 
+// Stock only: WAREHOUSE (and OWNER / PRODUCT_MANAGER). Prices untouched.
+export async function updateProductStock(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const productId = readText(formData, "productId");
+  const stock = Number(readText(formData, "stock"));
+
+  if (!productId) {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
+
+  if (!Number.isInteger(stock) || stock < 0 || stock > 1_000_000) {
+    return fail("Stok 0 və ya daha böyük tam ədəd olmalıdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("update_admin_product_stock", {
+    p_product_id: productId,
+    p_stock: stock,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Stok yenilənmədi."));
+  }
+
+  revalidateProductPaths(productId);
+
+  return ok("Stok yadda saxlandı.");
+}
+
 export async function updateProductActive(
   _state: ActionResult,
   formData: FormData

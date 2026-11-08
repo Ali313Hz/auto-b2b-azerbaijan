@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import ActionForm from "@/components/ActionForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, Field, PageHeader } from "@/components/ui";
-import { requireOwner } from "@/lib/auth";
+import { requireStaff } from "@/lib/auth";
 import { uuidPattern } from "@/lib/format";
+import { can } from "@/lib/roles";
 import { signMediaPaths } from "@/lib/media";
 
 import {
@@ -16,6 +17,7 @@ import {
   updateProduct,
   updateProductActive,
   updateProductContent,
+  updateProductStock,
   uploadProductImage,
 } from "../actions";
 import ImageFileInput from "../ImageFileInput";
@@ -44,7 +46,68 @@ export default async function AdminProductDetailPage({
     notFound();
   }
 
-  const { supabase } = await requireOwner();
+  const { supabase, role } = await requireStaff("productsView");
+
+  // WAREHOUSE: stock only (the database also hides prices from this role).
+  if (!can(role, "productsEdit")) {
+    const { data: rows } = await supabase.rpc("get_admin_product", {
+      p_product_id: id,
+    });
+    const item = rows?.[0];
+
+    if (!item) {
+      notFound();
+    }
+
+    return (
+      <>
+        <Link
+          href="/admin/products"
+          className="mb-4 inline-block text-sm text-zinc-500 hover:text-zinc-200"
+        >
+          ← Məhsullar
+        </Link>
+
+        <PageHeader
+          title={item.name}
+          description={`SKU: ${item.sku}${item.category_name ? ` · ${item.category_name}` : ""}`}
+          actions={
+            item.active ? (
+              <Badge tone="green">Aktiv</Badge>
+            ) : (
+              <Badge tone="red">Deaktiv</Badge>
+            )
+          }
+        />
+
+        <section className="card max-w-md p-5 sm:p-6">
+          <h2 className="mb-4 font-semibold text-white">Stok</h2>
+
+          <ActionForm action={updateProductStock} className="space-y-4">
+            <input type="hidden" name="productId" value={item.id} />
+
+            <Field label="Stok (ədəd)" htmlFor="stock">
+              <input
+                id="stock"
+                name="stock"
+                type="number"
+                min={0}
+                max={1000000}
+                step={1}
+                required
+                defaultValue={item.stock}
+                className="input"
+              />
+            </Field>
+
+            <SubmitButton pendingText="Yadda saxlanılır...">
+              Stoku yadda saxla
+            </SubmitButton>
+          </ActionForm>
+        </section>
+      </>
+    );
+  }
 
   const [{ data: products }, { data: categories }, { data: media }] =
     await Promise.all([
