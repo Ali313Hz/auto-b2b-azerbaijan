@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import ActionForm from "@/components/ActionForm";
+import CategoryThumb from "@/components/CategoryThumb";
+import ConfirmForm from "@/components/ConfirmForm";
 import SubmitButton from "@/components/SubmitButton";
 import { Alert, Badge, EmptyState, Field, PageHeader } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { categoryPath, maxCategoryDepth } from "@/lib/format";
+import { signCardImages } from "@/lib/media";
 
-import { createCategory, updateCategory } from "./actions";
+import { createCategory, deleteCategory, updateCategory } from "./actions";
+import CategoryImageEditor from "./CategoryImageEditor";
 
 export const metadata: Metadata = {
   title: "Kateqoriyalar",
@@ -60,12 +65,45 @@ export default async function AdminCategoriesPage() {
     return result;
   };
 
+  // Products in a category including all of its sub-categories.
+  const totalCount = new Map<string, number>();
+  const countOf = (id: string): number => {
+    if (!totalCount.has(id)) {
+      const own = Number(allCategories.find((item) => item.id === id)?.product_count ?? 0);
+      totalCount.set(
+        id,
+        own + (childrenOf.get(id) ?? []).reduce((sum, child) => sum + countOf(child), 0)
+      );
+    }
+
+    return totalCount.get(id) as number;
+  };
+  const emptyCount = allCategories.filter((category) => countOf(category.id) === 0).length;
+
+  const imageUrls = await signCardImages(
+    supabase,
+    allCategories.map((category) => category.image_path)
+  );
+
   return (
     <>
       <PageHeader
         title="Kateqoriyalar"
-        description="Kateqoriya → alt kateqoriya → alt kateqoriya ... İstənilən kateqoriyanın altına “Alt kateqoriya əlavə et” ilə yenisini yaradın. Deaktiv kateqoriyanın bütün alt kateqoriyalarındakı məhsullar müştərilərə göstərilmir. Kateqoriyalar silinmir."
+        description="Kateqoriya → alt kateqoriya → alt kateqoriya ... İstənilən kateqoriyanın altına “Alt kateqoriya əlavə et” ilə yenisini yaradın. Deaktiv kateqoriyanın bütün alt kateqoriyalarındakı məhsullar müştərilərə göstərilmir. Yalnız boş kateqoriya (alt kateqoriyası və məhsulu olmayan) silinə bilər."
       />
+
+      {emptyCount > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-600/60 bg-amber-950/30 p-4 text-sm text-amber-100">
+          <p className="font-semibold text-amber-300">
+            ⚠ {emptyCount} kateqoriya boşdur
+          </p>
+          <p className="mt-1 text-amber-100/80">
+            Bu kateqoriyalarda hələ məhsul yoxdur və aşağıda sarı rənglə
+            göstərilib. Müştərilər orada “Tezliklə” yazısını görür — məhsul
+            əlavə etməyiniz məsləhətdir.
+          </p>
+        </div>
+      )}
 
       <section className="card mb-6 p-4 sm:p-5">
         <h2 className="mb-3 font-semibold text-white">Yeni əsas kateqoriya</h2>
@@ -106,25 +144,61 @@ export default async function AdminCategoriesPage() {
             const parentOptions = allCategories.filter(
               (option) => !blocked.has(option.id) && option.depth < maxCategoryDepth
             );
+            const total = countOf(category.id);
+            const own = Number(category.product_count);
+            const hasChildren = (childrenOf.get(category.id) ?? []).length > 0;
+            const deletable = !hasChildren && own === 0;
+            const imageUrl = category.image_path ? imageUrls.get(category.image_path) ?? null : null;
 
             return (
-              <li key={category.id} className="p-3 sm:p-4">
+              <li
+                key={category.id}
+                className={`p-3 sm:p-4 ${total === 0 ? "border-l-4 border-l-amber-500 bg-amber-950/15" : ""}`}
+              >
                 <div style={indentStyle(category.depth)}>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <div className="flex items-center gap-3">
                     {category.depth > 1 && (
                       <span aria-hidden className="text-zinc-600">
                         └
                       </span>
                     )}
-                    <span className={`font-semibold break-words ${category.depth === 1 ? "text-lg text-white" : "text-zinc-100"}`}>
-                      {category.name}
-                    </span>
-                    {!category.active && <Badge tone="red">Deaktiv</Badge>}
-                    {category.active && !category.available && (
-                      <Badge tone="amber">Ana kateqoriya deaktivdir</Badge>
-                    )}
-                    <span className="text-xs text-zinc-500">{category.product_count} məhsul</span>
+                    <CategoryThumb
+                      url={imageUrl}
+                      name={category.name}
+                      className="size-12 shrink-0 rounded-lg border border-zinc-800"
+                      letterClassName="text-lg"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className={`font-semibold break-words ${category.depth === 1 ? "text-lg text-white" : "text-zinc-100"}`}>
+                          {category.name}
+                        </span>
+                        {!category.active && <Badge tone="red">Deaktiv</Badge>}
+                        {category.active && !category.available && (
+                          <Badge tone="amber">Ana kateqoriya deaktivdir</Badge>
+                        )}
+                        {total === 0 && <Badge tone="amber">Boşdur</Badge>}
+                      </div>
+                      <p className="text-xs text-zinc-500">
+                        {own} məhsul
+                        {total !== own ? ` · alt kateqoriyalarla cəmi ${total}` : ""}
+                      </p>
+                    </div>
                   </div>
+
+                  {total === 0 && (
+                    <div className="mt-2 flex flex-col gap-2 rounded-lg border border-amber-700/50 bg-amber-950/30 p-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-amber-200">
+                        Bu bölmə boşdur — hələ məhsul əlavə olunmayıb. Doldurmağınız məsləhətdir.
+                      </p>
+                      <Link
+                        href={`/admin/products/new?category=${category.id}`}
+                        className="btn btn-sm shrink-0 bg-amber-500 font-semibold text-zinc-950 hover:bg-amber-400"
+                      >
+                        + Məhsul əlavə et
+                      </Link>
+                    </div>
+                  )}
 
                   <div className="mt-2 flex flex-wrap gap-2">
                     {category.depth < maxCategoryDepth && (
@@ -245,6 +319,38 @@ export default async function AdminCategoriesPage() {
                         </div>
                       </ActionForm>
                     </details>
+
+                    <details className="w-full sm:w-auto">
+                      <summary className="btn btn-secondary btn-sm cursor-pointer list-none">
+                        {imageUrl ? "Şəkil" : "+ Şəkil əlavə et"}
+                      </summary>
+                      <CategoryImageEditor
+                        categoryId={category.id}
+                        name={category.name}
+                        imageUrl={imageUrl}
+                      />
+                    </details>
+
+                    {deletable ? (
+                      <ConfirmForm
+                        action={deleteCategory}
+                        fields={{ categoryId: category.id }}
+                        label="Sil"
+                        question={`“${category.name}” kateqoriyasını silmək istəyirsiniz?`}
+                        description="Kateqoriya boşdur. Silindikdən sonra geri qaytarmaq olmur."
+                        confirmLabel="Bəli, sil"
+                        pendingText="Silinir..."
+                        tone="danger"
+                        className="w-full sm:w-auto"
+                      />
+                    ) : (
+                      <span
+                        className="self-center text-xs text-zinc-500"
+                        title="Silmək üçün əvvəlcə alt kateqoriyaları və məhsulları başqa yerə köçürün."
+                      >
+                        Silmək olmur: {hasChildren ? "alt kateqoriyası var" : "məhsulu var"}
+                      </span>
+                    )}
                   </div>
                 </div>
               </li>

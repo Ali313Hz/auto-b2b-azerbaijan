@@ -115,6 +115,7 @@ export type Database = {
           active: boolean
           created_at: string
           id: string
+          image_path: string | null
           name: string
           parent_id: string | null
           slug: string
@@ -125,6 +126,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          image_path?: string | null
           name: string
           parent_id?: string | null
           slug: string
@@ -135,6 +137,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          image_path?: string | null
           name?: string
           parent_id?: string | null
           slug?: string
@@ -737,8 +740,10 @@ export type Database = {
         Args: never
         Returns: {
           id: string
+          image_path: string | null
           name: string
           parent_id: string | null
+          product_count: number
           slug: string
           sort_order: number
         }[]
@@ -892,6 +897,7 @@ export type Database = {
           available: boolean
           depth: number
           id: string
+          image_path: string | null
           name: string
           parent_id: string | null
           path: string
@@ -899,6 +905,14 @@ export type Database = {
           slug: string
           sort_order: number
         }[]
+      }
+      delete_admin_category: {
+        Args: { p_category_id: string }
+        Returns: string | null
+      }
+      set_admin_category_image: {
+        Args: { p_category_id: string; p_image_path: string | null }
+        Returns: string | null
       }
       get_admin_customer_delete_status: {
         Args: { p_customer_id: string }

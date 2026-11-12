@@ -10,7 +10,10 @@ export const metadata: Metadata = {
   title: "Yeni məhsul",
 };
 
-export default async function NewProductPage() {
+export default async function NewProductPage({
+  searchParams,
+}: PageProps<"/admin/products/new">) {
+  const { category: categoryParam } = await searchParams;
   const { supabase } = await requireStaff("productsEdit");
 
   const { data: categories, error } = await supabase.rpc(
@@ -45,6 +48,13 @@ export default async function NewProductPage() {
         />
       ) : (
         <ProductCreateForm
+          // "+ Məhsul əlavə et" on an empty category opens the form with it.
+          initialCategoryId={
+            typeof categoryParam === "string" &&
+            (categories ?? []).some((category) => category.id === categoryParam)
+              ? categoryParam
+              : ""
+          }
           categories={(categories ?? []).map((category) => ({
             id: category.id,
             name: category.name,

@@ -10,6 +10,7 @@ import {
   ok,
 } from "@/lib/action-result";
 import { uuidPattern } from "@/lib/format";
+import { thumbnailPathFor } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
 
 const transliteration: Record<string, string> = {
@@ -174,4 +175,160 @@ export async function updateCategory(
   revalidateCategoryPaths();
 
   return ok("Yadda saxlandı.");
+}
+
+const imageExtensions: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+const maxImageSize = 5 * 1024 * 1024;
+const maxThumbnailSize = 512 * 1024;
+
+type Client = Awaited<ReturnType<typeof getAuthedClient>>;
+
+// Removes an image and its small catalog copy from storage.
+async function removeImageFiles(supabase: Client, path: string | null | undefined) {
+  if (!path) {
+    return true;
+  }
+
+  const { error } = await supabase.storage
+    .from("product-media")
+    .remove([path, thumbnailPathFor(path)].filter((item): item is string => Boolean(item)));
+
+  return !error;
+}
+
+function readCategoryId(formData: FormData) {
+  const value = formData.get("categoryId");
+
+  return typeof value === "string" && uuidPattern.test(value) ? value : null;
+}
+
+// Uploads (or replaces) the image of a category (OWNER, PRODUCT_MANAGER;
+// storage policies and the database check the role).
+export async function uploadCategoryImage(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const categoryId = readCategoryId(formData);
+  const image = formData.get("image");
+
+  if (!categoryId) {
+    return fail("Kateqoriya məlumatı yanlışdır.");
+  }
+
+  if (!(image instanceof File) || image.size === 0) {
+    return fail("Şəkil seçin.");
+  }
+
+  const extension = imageExtensions[image.type];
+
+  if (!extension) {
+    return fail("Yalnız JPG, PNG və ya WEBP şəkil yükləmək olar.");
+  }
+
+  if (image.size > maxImageSize) {
+    return fail("Şəklin həcmi 5 MB-dan çox ola bilməz.");
+  }
+
+  const supabase = await getAuthedClient();
+  const storagePath = `categories/${categoryId}/${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("product-media")
+    .upload(storagePath, image, { contentType: image.type, upsert: false });
+
+  if (uploadError) {
+    return fail("Şəkil yaddaşa yüklənmədi.");
+  }
+
+  const thumbnail = formData.get("thumbnail");
+
+  if (
+    thumbnail instanceof File &&
+    thumbnail.size > 0 &&
+    thumbnail.size <= maxThumbnailSize &&
+    thumbnail.type === "image/webp"
+  ) {
+    await supabase.storage
+      .from("product-media")
+      .upload(thumbnailPathFor(storagePath) as string, thumbnail, {
+        contentType: "image/webp",
+        upsert: false,
+      });
+  }
+
+  const { data: oldPath, error } = await supabase.rpc("set_admin_category_image", {
+    p_category_id: categoryId,
+    p_image_path: storagePath,
+  });
+
+  if (error) {
+    await removeImageFiles(supabase, storagePath);
+
+    return fail(dbErrorMessage(error, "Şəkil kateqoriyaya bağlanmadı."));
+  }
+
+  await removeImageFiles(supabase, oldPath);
+  revalidateCategoryPaths();
+
+  return ok("Şəkil yükləndi.");
+}
+
+export async function removeCategoryImage(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const categoryId = readCategoryId(formData);
+
+  if (!categoryId) {
+    return fail("Kateqoriya məlumatı yanlışdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { data: oldPath, error } = await supabase.rpc("set_admin_category_image", {
+    p_category_id: categoryId,
+    p_image_path: null,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Şəkil silinmədi."));
+  }
+
+  await removeImageFiles(supabase, oldPath);
+  revalidateCategoryPaths();
+
+  return ok("Şəkil silindi.");
+}
+
+// Only an empty category (no sub-categories, no products) can be deleted;
+// the database checks this and refuses otherwise.
+export async function deleteCategory(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const categoryId = readCategoryId(formData);
+
+  if (!categoryId) {
+    return fail("Kateqoriya məlumatı yanlışdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { data: imagePath, error } = await supabase.rpc("delete_admin_category", {
+    p_category_id: categoryId,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Kateqoriya silinmədi."));
+  }
+
+  await removeImageFiles(supabase, imagePath);
+  revalidateCategoryPaths();
+
+  return ok("Kateqoriya silindi.");
 }

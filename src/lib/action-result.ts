@@ -25,6 +25,12 @@ const dbMessages: Record<string, string> = {
   "SKU is required": "SKU tələb olunur.",
   "Category slug already exists": "Bu slug artıq istifadə olunur.",
   "Category not found": "Kateqoriya tapılmadı.",
+  "Category has subcategories":
+    "Bu kateqoriyanın alt kateqoriyaları var. Əvvəlcə onları silin və ya başqa yerə köçürün.",
+  "Category has products":
+    "Bu kateqoriyada məhsul var. Əvvəlcə məhsulları başqa kateqoriyaya köçürün.",
+  "Invalid category image": "Şəkil yanlışdır. Yenidən yükləyin.",
+  "Not authorized to delete categories": "Kateqoriyanı silməyə icazəniz yoxdur.",
   "Only pending orders can change status":
     "Yalnız gözləyən sifarişlərin statusu dəyişdirilə bilər.",
   "Order not found": "Sifariş tapılmadı.",

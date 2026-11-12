@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import CategoryThumb from "@/components/CategoryThumb";
 import Pagination, { pageHref } from "@/components/Pagination";
 import { Alert, Badge, EmptyState, PageHeader } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
@@ -86,10 +87,35 @@ export default async function ProductsPage({
   const categoryHref = (slug: string) =>
     pageHref("/products", { ...linkParams, category: slug || undefined }, 1);
 
-  const imageUrls = await signCardImages(
-    supabase,
-    visibleProducts.map((product) => product.primary_image_path)
-  );
+  // Products a customer can see in a category including its sub-categories.
+  const totals = new Map<string, number>();
+  const totalOf = (id: string): number => {
+    if (!totals.has(id)) {
+      const own = Number(byId.get(id)?.product_count ?? 0);
+      totals.set(
+        id,
+        own +
+          allCategories
+            .filter((category) => category.parent_id === id)
+            .reduce((sum, child) => sum + totalOf(child.id), 0)
+      );
+    }
+
+    return totals.get(id) as number;
+  };
+
+  // Browsing (no search, no sale filter): sub-categories as picture cards.
+  const browsing = !query && !saleOnly;
+  const cardCategories = browsing
+    ? allCategories.filter((category) => (category.parent_id ?? null) === (selected?.id ?? null))
+    : [];
+  const emptyCategory = Boolean(selected && browsing && totalOf(selected.id) === 0);
+
+  // One signing request for product and category pictures.
+  const imageUrls = await signCardImages(supabase, [
+    ...visibleProducts.map((product) => product.primary_image_path),
+    ...cardCategories.map((category) => category.image_path),
+  ]);
 
   return (
     <>
@@ -117,6 +143,29 @@ export default async function ProductsPage({
 
       <div className="mb-6 flex flex-col gap-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          {browsing ? (
+            // Browsing: a simple path back up; the categories are the cards below.
+            <nav aria-label="Kateqoriya yolu" className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-2 text-sm">
+              <Link
+                href={categoryHref("")}
+                className={`btn btn-sm ${selected ? "btn-secondary" : "btn-primary"}`}
+              >
+                Bütün kateqoriyalar
+              </Link>
+              {trail.map((node, index) => (
+                <span key={node.id} className="flex items-center gap-1">
+                  <span aria-hidden className="text-zinc-600">›</span>
+                  <Link
+                    href={categoryHref(node.slug)}
+                    aria-current={index === trail.length - 1 ? "page" : undefined}
+                    className={`btn btn-sm whitespace-nowrap ${index === trail.length - 1 ? "btn-primary" : "btn-secondary"}`}
+                  >
+                    {node.name}
+                  </Link>
+                </span>
+              ))}
+            </nav>
+          ) : (
           <nav aria-label="Kateqoriyalar" className="min-w-0 space-y-2">
             {levels.map((level, index) => (
               <div key={index} className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1">
@@ -145,11 +194,55 @@ export default async function ProductsPage({
               </div>
             ))}
           </nav>
+          )}
 
           <Suspense fallback={<div className="h-10 w-full lg:w-[30rem]" />}>
             <CatalogSearch />
           </Suspense>
         </div>
+
+        {cardCategories.length > 0 && (
+          <section aria-label={selected ? `${selected.name} alt kateqoriyaları` : "Kateqoriyalar"}>
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {cardCategories.map((category, index) => {
+                const count = totalOf(category.id);
+                const url = category.image_path ? imageUrls.get(category.image_path) : undefined;
+
+                return (
+                  <li key={category.id} className="min-w-0">
+                    <Link
+                      href={categoryHref(category.slug)}
+                      className="card group flex h-full flex-col overflow-hidden transition hover:border-amber-500/70"
+                    >
+                      <span className="relative block aspect-[4/3] overflow-hidden">
+                        <CategoryThumb
+                          url={url}
+                          name={category.name}
+                          eager={index < 6}
+                          className="h-full w-full transition-transform group-hover:scale-[1.03]"
+                          letterClassName="text-4xl"
+                        />
+                        {count === 0 && (
+                          <span className="absolute top-2 left-2 rounded bg-zinc-950/80 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
+                            Tezliklə
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex flex-1 flex-col gap-0.5 p-2.5">
+                        <span className="line-clamp-2 text-sm font-semibold break-words text-white group-hover:text-amber-400">
+                          {category.name}
+                        </span>
+                        <span className="text-xs text-zinc-500">
+                          {count > 0 ? `${count} məhsul` : "Hələ məhsul yoxdur"}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {hasFilters && (
           <p className="text-sm text-zinc-400">
@@ -160,7 +253,17 @@ export default async function ProductsPage({
         )}
       </div>
 
-      {visibleProducts.length === 0 ? (
+      {emptyCategory && selected ? (
+        <EmptyState
+          title="Bu kateqoriyaya hələ məhsul əlavə olunmayıb"
+          description={`“${selected.name}” bölməsində tezliklə yeni məhsullar olacaq. Hələlik digər kateqoriyalara baxa bilərsiniz.`}
+          action={
+            <Link href="/products" className="btn btn-secondary">
+              Bütün kateqoriyalar
+            </Link>
+          }
+        />
+      ) : visibleProducts.length === 0 ? (
         <EmptyState
           title={
             saleOnly && !selectedCategory && !query

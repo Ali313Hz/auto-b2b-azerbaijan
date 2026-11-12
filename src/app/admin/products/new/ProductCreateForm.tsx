@@ -58,15 +58,17 @@ function pick(files: File[], check: (file: File) => string | null) {
 
 export default function ProductCreateForm({
   categories,
+  initialCategoryId = "",
 }: {
   categories: CategoryOption[];
+  initialCategoryId?: string;
 }) {
   const router = useRouter();
   const busy = useRef(false);
 
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
   const [description, setDescription] = useState("");
   const [stock, setStock] = useState("");
   const [prices, setPrices] = useState<PriceState>(emptyPrices);
