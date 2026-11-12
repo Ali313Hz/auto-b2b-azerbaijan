@@ -104,12 +104,17 @@ export default async function ProductsPage({
     return totals.get(id) as number;
   };
 
+  // Older database versions return no counts: then no count labels at all.
+  const countsKnown = allCategories.every((category) => category.product_count != null);
+
   // Browsing (no search, no sale filter): sub-categories as picture cards.
   const browsing = !query && !saleOnly;
   const cardCategories = browsing
     ? allCategories.filter((category) => (category.parent_id ?? null) === (selected?.id ?? null))
     : [];
-  const emptyCategory = Boolean(selected && browsing && totalOf(selected.id) === 0);
+  // The catalog result decides: a category is "empty" only when it really
+  // returned no products (counts are only used for the card labels).
+  const emptyCategory = Boolean(selected && browsing && visibleProducts.length === 0);
 
   // One signing request for product and category pictures.
   const imageUrls = await signCardImages(supabase, [
@@ -222,7 +227,7 @@ export default async function ProductsPage({
                           className="h-full w-full transition-transform group-hover:scale-[1.03]"
                           letterClassName="text-4xl"
                         />
-                        {count === 0 && (
+                        {countsKnown && count === 0 && (
                           <span className="absolute top-2 left-2 rounded bg-zinc-950/80 px-2 py-0.5 text-[11px] font-semibold text-amber-300">
                             Tezliklə
                           </span>
@@ -232,9 +237,11 @@ export default async function ProductsPage({
                         <span className="line-clamp-2 text-sm font-semibold break-words text-white group-hover:text-amber-400">
                           {category.name}
                         </span>
-                        <span className="text-xs text-zinc-500">
-                          {count > 0 ? `${count} məhsul` : "Hələ məhsul yoxdur"}
-                        </span>
+                        {countsKnown && (
+                          <span className="text-xs text-zinc-500">
+                            {count > 0 ? `${count} məhsul` : "Hələ məhsul yoxdur"}
+                          </span>
+                        )}
                       </span>
                     </Link>
                   </li>
