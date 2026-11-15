@@ -53,6 +53,8 @@ try {
     [U.NORMAL, "CONFIRMED", null, "STANDARD", "2026-10-31T21:30:00Z", [[A, 4, 10]]], // 40 sale (Nov)
     // 31 Oct 19:30 UTC = 31 Oct 23:30 in Baku -> October
     [U.NORMAL, "CONFIRMED", null, "STANDARD", "2026-10-31T19:30:00Z", [[A, 1, 10]]], // 10 sale (Oct)
+    // December: an older pending order with no payment information at all
+    [U.DEALER, "PENDING", null, "STANDARD", "2026-12-10T10:00:00Z", [[B, 1, 25]]], // 25 pending
   ];
   const ids = [];
   for (const [customer, status, payment, type, at, lines] of orders) {
@@ -162,10 +164,19 @@ try {
   r = await as("OWNER", "select * from public.get_admin_report_orders('2026-10-01', '2026-10-31')");
   ok("orders for Excel exclude cancelled", r.rows?.length === 6 && !r.rows.some((x) => x.status === "CANCELLED"));
   ok("orders for Excel mark sales", r.rows?.filter((x) => x.is_sale).length === 4);
+  ok("orders for Excel: is_sale is never empty", r.rows?.every((x) => typeof x.is_sale === "boolean"));
+
+  // ---- Pending order without any payment information (older orders).
+  r = await as("OWNER", "select * from public.get_admin_report_summary('2026-12-01', '2026-12-31')");
+  const dec = r.rows?.[0] ?? {};
+  ok("pending order without payment info is pending", Number(dec.pending_count) === 1 && Number(dec.pending_total) === 25, JSON.stringify(dec));
+  ok("pending order without payment info is not a sale", Number(dec.sale_count) === 0 && Number(dec.sales_total) === 0);
+  r = await as("OWNER", "select * from public.get_admin_report_orders('2026-12-01', '2026-12-31')");
+  ok("Excel: pending order without payment info is_sale = false", r.rows?.length === 1 && r.rows[0].is_sale === false, JSON.stringify(r));
 
   // ---- Nothing was changed by reading.
   const after = (await c.query("select count(*)::int n, sum(total_amount)::numeric s from public.orders")).rows[0];
-  ok("reports change no data", after.n === 8 && Number(after.s) === 50 + 10 + 90 + 1000 + 60 + 30 + 40 + 10);
+  ok("reports change no data", after.n === 9 && Number(after.s) === 50 + 10 + 90 + 1000 + 60 + 30 + 40 + 10 + 25);
 
   await c.end();
 } catch (error) {
