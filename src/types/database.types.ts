@@ -782,6 +782,79 @@ export type Database = {
           total_amount: number
         }[]
       }
+      get_admin_report_summary: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          average_order: number
+          cancelled_count: number
+          confirmed_count: number
+          order_count: number
+          paid_total: number
+          pending_count: number
+          pending_total: number
+          preorder_count: number
+          sale_count: number
+          sales_total: number
+        }[]
+      }
+      get_admin_report_monthly: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          month: string
+          order_count: number
+          paid_total: number
+          sale_count: number
+          sales_total: number
+        }[]
+      }
+      get_admin_report_products: {
+        Args: { p_from: string; p_limit?: number; p_to: string }
+        Returns: {
+          name: string | null
+          order_count: number
+          product_id: string
+          quantity: number
+          sales_total: number
+          sku: string
+        }[]
+      }
+      get_admin_report_unsold_products: {
+        Args: { p_from: string; p_page?: number; p_page_size?: number; p_to: string }
+        Returns: {
+          category_name: string | null
+          created_at: string
+          name: string
+          product_id: string
+          sku: string
+          stock: number
+          total_count: number
+        }[]
+      }
+      get_admin_report_customers: {
+        Args: { p_from: string; p_limit?: number; p_to: string }
+        Returns: {
+          company_name: string | null
+          contact_name: string | null
+          customer_id: string
+          order_count: number
+          sales_total: number
+        }[]
+      }
+      get_admin_report_orders: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          company_name: string | null
+          contact_name: string | null
+          created_at: string
+          is_sale: boolean
+          item_count: number
+          order_id: string
+          order_type: Database["public"]["Enums"]["order_type"]
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+        }[]
+      }
       set_customer_favorite: {
         Args: { p_favorite: boolean; p_product_id: string }
         Returns: boolean

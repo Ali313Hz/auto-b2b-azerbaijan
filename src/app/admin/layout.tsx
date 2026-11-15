@@ -50,6 +50,9 @@ export default async function AdminLayout({
             {can(role, "customersView") && (
               <NavLink href="/admin/customers">Müştərilər</NavLink>
             )}
+            {can(role, "reports") && (
+              <NavLink href="/admin/reports">Hesabatlar</NavLink>
+            )}
             {can(role, "owner") && <NavLink href="/admin/staff">İşçilər</NavLink>}
             {can(role, "owner") && <NavLink href="/admin/audit">Audit</NavLink>}
             {SHOW_MFA_SETTINGS && <NavLink href="/security">2FA</NavLink>}
