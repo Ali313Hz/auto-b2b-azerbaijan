@@ -20,13 +20,20 @@ export default async function NewProductPage({
     "get_admin_categories"
   );
 
+  // Opened from a category ("+ Məhsul əlavə et"): that category is
+  // preselected and the back link returns to it.
+  const fromCategory =
+    typeof categoryParam === "string"
+      ? (categories ?? []).find((category) => category.id === categoryParam)
+      : undefined;
+
   return (
     <>
       <Link
-        href="/admin/products"
+        href={fromCategory ? `/admin/categories/${fromCategory.id}` : "/admin/products"}
         className="mb-4 inline-block text-sm text-zinc-500 hover:text-zinc-200"
       >
-        ← Məhsullar
+        {fromCategory ? `← ${fromCategory.name}` : "← Məhsullar"}
       </Link>
 
       <PageHeader
@@ -49,12 +56,7 @@ export default async function NewProductPage({
       ) : (
         <ProductCreateForm
           // "+ Məhsul əlavə et" on an empty category opens the form with it.
-          initialCategoryId={
-            typeof categoryParam === "string" &&
-            (categories ?? []).some((category) => category.id === categoryParam)
-              ? categoryParam
-              : ""
-          }
+          initialCategoryId={fromCategory?.id ?? ""}
           categories={(categories ?? []).map((category) => ({
             id: category.id,
             name: category.name,

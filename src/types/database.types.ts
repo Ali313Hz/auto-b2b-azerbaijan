@@ -113,6 +113,7 @@ export type Database = {
       categories: {
         Row: {
           active: boolean
+          color: string | null
           created_at: string
           id: string
           image_path: string | null
@@ -124,6 +125,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          color?: string | null
           created_at?: string
           id?: string
           image_path?: string | null
@@ -135,6 +137,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          color?: string | null
           created_at?: string
           id?: string
           image_path?: string | null
@@ -895,6 +898,7 @@ export type Database = {
         Returns: {
           active: boolean
           available: boolean
+          color: string | null
           depth: number
           id: string
           image_path: string | null
@@ -902,9 +906,18 @@ export type Database = {
           parent_id: string | null
           path: string
           product_count: number
+          root_id: string
           slug: string
           sort_order: number
         }[]
+      }
+      move_admin_category: {
+        Args: { p_category_id: string; p_direction: string }
+        Returns: number
+      }
+      set_admin_category_color: {
+        Args: { p_category_id: string; p_color: string | null }
+        Returns: undefined
       }
       delete_admin_category: {
         Args: { p_category_id: string }

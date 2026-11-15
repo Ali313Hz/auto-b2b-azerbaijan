@@ -68,6 +68,10 @@ const dbMessages: Record<string, string> = {
   "Price is too high": "Qiymət çox böyükdür.",
   "Sale price must be lower than normal price":
     "Endirimli qiymət normal qiymətdən aşağı olmalıdır.",
+  "Invalid move": "Sıra dəyişikliyi yanlışdır.",
+  "Invalid colour": "Rəng yanlışdır.",
+  "Only main categories have a colour":
+    "Rəng yalnız əsas kateqoriyaya verilir; alt kateqoriyalar onun açıq çalarını alır.",
   "Stock cannot be negative": "Stok 0 və ya daha böyük tam ədəd olmalıdır.",
 };
 

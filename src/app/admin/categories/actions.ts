@@ -9,6 +9,7 @@ import {
   fail,
   ok,
 } from "@/lib/action-result";
+import { isCategoryColor } from "@/lib/category-colors";
 import { uuidPattern } from "@/lib/format";
 import { thumbnailPathFor } from "@/lib/media";
 import { createClient } from "@/lib/supabase/server";
@@ -305,6 +306,64 @@ export async function removeCategoryImage(
   return ok("Şəkil silindi.");
 }
 
+const moveDirections = ["up", "down", "top", "bottom"] as const;
+export type MoveDirection = (typeof moveDirections)[number];
+
+// ↑ / ↓ / Ən yuxarı / Ən aşağı inside the same parent (OWNER,
+// PRODUCT_MANAGER; the database checks the role and only ever reorders the
+// category among its own siblings).
+export async function moveCategory(
+  categoryId: string,
+  direction: MoveDirection
+): Promise<ActionResult> {
+  if (!uuidPattern.test(categoryId) || !moveDirections.includes(direction)) {
+    return fail("Kateqoriya məlumatı yanlışdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("move_admin_category", {
+    p_category_id: categoryId,
+    p_direction: direction,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Sıra dəyişdirilmədi."));
+  }
+
+  revalidateCategoryPaths();
+
+  return ok("Sıra dəyişdirildi.");
+}
+
+// Colour of a main category ("" = automatic).
+export async function setCategoryColor(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const categoryId = readCategoryId(formData);
+  const color = String(formData.get("color") ?? "");
+
+  if (!categoryId || (color && !isCategoryColor(color))) {
+    return fail("Rəng yanlışdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("set_admin_category_color", {
+    p_category_id: categoryId,
+    p_color: color || null,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Rəng yadda saxlanmadı."));
+  }
+
+  revalidateCategoryPaths();
+
+  return ok("Rəng yadda saxlandı.");
+}
+
 // Only an empty category (no sub-categories, no products) can be deleted;
 // the database checks this and refuses otherwise.
 export async function deleteCategory(
@@ -329,6 +388,11 @@ export async function deleteCategory(
 
   await removeImageFiles(supabase, imagePath);
   revalidateCategoryPaths();
+
+  // Deleted from its own page: back to the tree.
+  if (formData.get("returnTo") === "list") {
+    redirect("/admin/categories?notice=deleted");
+  }
 
   return ok("Kateqoriya silindi.");
 }
