@@ -9,6 +9,7 @@ import {
   fail,
   ok,
 } from "@/lib/action-result";
+import { uuidPattern } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 export async function addToCart(
@@ -48,4 +49,36 @@ export async function addToCart(
   revalidatePath("/", "layout");
 
   return ok("Səbətə əlavə edildi.");
+}
+
+// ♡ / ♥: adds or removes a favorite of the signed-in customer only (the
+// database uses the session's user; another customer's list cannot be
+// touched).
+export async function setFavorite(productId: string, favorite: boolean): Promise<ActionResult> {
+  if (!uuidPattern.test(productId) || typeof favorite !== "boolean") {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { error } = await supabase.rpc("set_customer_favorite", {
+    p_product_id: productId,
+    p_favorite: favorite,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Seçilmişlər yenilənmədi."));
+  }
+
+  revalidatePath("/favorites");
+
+  return ok(favorite ? "Seçilmişlərə əlavə edildi." : "Seçilmişlərdən çıxarıldı.");
 }

@@ -8,6 +8,7 @@ import { formatAzn, uuidPattern } from "@/lib/format";
 import { signMediaPaths } from "@/lib/media";
 
 import AddToCartForm from "../AddToCartForm";
+import FavoriteButton from "../FavoriteButton";
 import ProductImageGallery from "../ProductImageGallery";
 
 export const metadata: Metadata = {
@@ -27,9 +28,10 @@ export default async function ProductDetailPage({
 
   // One product (with this customer's price) and its gallery/videos; the
   // gallery is only loaded on the detail page, never in the catalog.
-  const [{ data: products }, { data: media }] = await Promise.all([
+  const [{ data: products }, { data: media }, { data: favoriteIds }] = await Promise.all([
     supabase.rpc("get_customer_product", { p_product_id: id }),
     supabase.rpc("get_customer_product_media", { p_product_id: id }),
+    supabase.rpc("get_customer_favorite_ids", { p_product_ids: [id] }),
   ]);
 
   const product = products?.[0];
@@ -103,9 +105,17 @@ export default async function ProductDetailPage({
             )}
           </div>
 
-          <h1 className="mt-3 text-2xl font-semibold break-words text-white sm:text-3xl">
-            {product.name}
-          </h1>
+          <div className="mt-3 flex items-start justify-between gap-3">
+            <h1 className="min-w-0 text-2xl font-semibold break-words text-white sm:text-3xl">
+              {product.name}
+            </h1>
+            <FavoriteButton
+              productId={product.id}
+              productName={product.name}
+              initial={(favoriteIds ?? []).includes(product.id)}
+              className="shrink-0"
+            />
+          </div>
 
           <p className="mt-2 font-mono text-sm text-zinc-500">
             SKU: {product.sku}

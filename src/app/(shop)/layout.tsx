@@ -35,6 +35,7 @@ export default async function ShopLayout({
             >
               Endirimdə olanlar
             </Link>
+            <NavLink href="/favorites">♥ Seçilmişlər</NavLink>
             <NavLink href="/orders">Sifarişlər</NavLink>
             <NavLink href="/account">Hesab</NavLink>
           </nav>

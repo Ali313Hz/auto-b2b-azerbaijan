@@ -770,6 +770,31 @@ export type Database = {
           total_amount: number
         }[]
       }
+      set_customer_favorite: {
+        Args: { p_favorite: boolean; p_product_id: string }
+        Returns: boolean
+      }
+      get_customer_favorite_ids: {
+        Args: { p_product_ids: string[] }
+        Returns: string[]
+      }
+      get_customer_favorites_page: {
+        Args: { p_page?: number; p_page_size?: number }
+        Returns: {
+          available: boolean
+          category_name: string | null
+          favorited_at: string
+          id: string
+          name: string
+          on_sale: boolean
+          price: number | null
+          primary_image_path: string | null
+          regular_price: number | null
+          sku: string
+          stock: number | null
+          total_count: number
+        }[]
+      }
       report_order_payment: {
         Args: { p_order_id: string }
         Returns: Database["public"]["Enums"]["payment_status"]

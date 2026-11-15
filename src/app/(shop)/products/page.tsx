@@ -11,6 +11,8 @@ import { signCardImages } from "@/lib/media";
 
 import AddToCartForm from "./AddToCartForm";
 import CatalogSearch from "./CatalogSearch";
+import CategorySidebar from "./CategorySidebar";
+import FavoriteButton from "./FavoriteButton";
 
 export const metadata: Metadata = {
   title: "Kataloq",
@@ -74,11 +76,6 @@ export default async function ProductsPage({
     trail.unshift(node);
   }
 
-  const levels = [
-    allCategories.filter((category) => !category.parent_id),
-    ...trail.map((node) => allCategories.filter((category) => category.parent_id === node.id)),
-  ].filter((level) => level.length > 0);
-
   const linkParams = {
     q: query,
     sort: sort === "name" ? undefined : sort,
@@ -116,11 +113,25 @@ export default async function ProductsPage({
   // returned no products (counts are only used for the card labels).
   const emptyCategory = Boolean(selected && browsing && visibleProducts.length === 0);
 
-  // One signing request for product and category pictures.
-  const imageUrls = await signCardImages(supabase, [
-    ...visibleProducts.map((product) => product.primary_image_path),
-    ...cardCategories.map((category) => category.image_path),
+  // One signing request for product and category pictures, and one
+  // request for which products on this page are favorites.
+  const [imageUrls, { data: favoriteIds }] = await Promise.all([
+    signCardImages(supabase, [
+      ...visibleProducts.map((product) => product.primary_image_path),
+      ...cardCategories.map((category) => category.image_path),
+    ]),
+    visibleProducts.length > 0
+      ? supabase.rpc("get_customer_favorite_ids", {
+          p_product_ids: visibleProducts.map((product) => product.id),
+        })
+      : Promise.resolve({ data: [] as string[] }),
   ]);
+  const favorites = new Set<string>(favoriteIds ?? []);
+
+  // Sidebar: categories only (no products), in the admin's order.
+  const sidebarHrefs = Object.fromEntries(
+    allCategories.map((category) => [category.slug, categoryHref(category.slug)])
+  );
 
   return (
     <>
@@ -146,11 +157,24 @@ export default async function ProductsPage({
         }
       />
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+      <CategorySidebar
+        categories={allCategories.map((category) => ({
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          parent_id: category.parent_id,
+        }))}
+        selectedSlug={selected ? selectedCategory : ""}
+        hrefs={sidebarHrefs}
+        allHref={categoryHref("")}
+      />
+
+      <div className="min-w-0">
       <div className="mb-6 flex flex-col gap-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          {browsing ? (
-            // Browsing: a simple path back up; the categories are the cards below.
-            <nav aria-label="Kateqoriya yolu" className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-2 text-sm">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          {/* A simple path back up; sub-categories are the cards below. */}
+          <nav aria-label="Kateqoriya yolu" className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-2 text-sm">
               <Link
                 href={categoryHref("")}
                 className={`btn btn-sm ${selected ? "btn-secondary" : "btn-primary"}`}
@@ -170,45 +194,15 @@ export default async function ProductsPage({
                 </span>
               ))}
             </nav>
-          ) : (
-          <nav aria-label="Kateqoriyalar" className="min-w-0 space-y-2">
-            {levels.map((level, index) => (
-              <div key={index} className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1">
-                {index === 0 && (
-                  <Link
-                    href={categoryHref("")}
-                    className={`btn btn-sm ${selectedCategory ? "btn-secondary" : "btn-primary"}`}
-                  >
-                    Hamısı
-                  </Link>
-                )}
 
-                {level.map((category) => {
-                  const active = trail.some((node) => node.id === category.id);
-
-                  return (
-                    <Link
-                      key={category.id}
-                      href={categoryHref(category.slug)}
-                      className={`btn btn-sm whitespace-nowrap ${active ? "btn-primary" : "btn-secondary"}`}
-                    >
-                      {category.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
-          </nav>
-          )}
-
-          <Suspense fallback={<div className="h-10 w-full lg:w-[30rem]" />}>
+          <Suspense fallback={<div className="h-10 w-full xl:w-[26rem]" />}>
             <CatalogSearch />
           </Suspense>
         </div>
 
         {cardCategories.length > 0 && (
           <section aria-label={selected ? `${selected.name} alt kateqoriyaları` : "Kateqoriyalar"}>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {cardCategories.map((category, index) => {
                 const count = totalOf(category.id);
                 const url = category.image_path ? imageUrls.get(category.image_path) : undefined;
@@ -293,7 +287,7 @@ export default async function ProductsPage({
           }
         />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visibleProducts.map((product, index) => {
             const imageUrl = product.primary_image_path
               ? imageUrls.get(product.primary_image_path)
@@ -302,8 +296,14 @@ export default async function ProductsPage({
             return (
               <li
                 key={product.id}
-                className="card flex min-w-0 flex-col overflow-hidden"
+                className="card relative flex min-w-0 flex-col overflow-hidden"
               >
+                <FavoriteButton
+                  productId={product.id}
+                  productName={product.name}
+                  initial={favorites.has(product.id)}
+                  className="absolute top-2 right-2 z-20"
+                />
                 <Link
                   href={`/products/${product.id}`}
                   className="group relative block aspect-[4/3] bg-zinc-950"
@@ -378,6 +378,8 @@ export default async function ProductsPage({
         basePath="/products"
         params={{ ...linkParams, category: selectedCategory || undefined }}
       />
+      </div>
+      </div>
     </>
   );
 }
