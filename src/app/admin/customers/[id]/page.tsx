@@ -13,8 +13,11 @@ import {
   formatDate,
   orderStatusLabels,
   orderStatusTones,
+  paymentBadge,
+  phoneHref,
   priceGroupLabels,
   shortId,
+  uuidPattern,
 } from "@/lib/format";
 
 import {
@@ -37,14 +40,22 @@ export default async function AdminCustomerDetailPage({
   searchParams,
 }: PageProps<"/admin/customers/[id]">) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
+
+  if (!uuidPattern.test(id)) {
+    notFound();
+  }
+
   const { supabase, role } = await requireStaff("customersView");
   const isOwner = can(role, "owner");
   const canEdit = can(role, "customersEdit");
 
-  const [{ data: customers }, { data: orders }, { data: loginRows }] =
+  const [{ data: customers }, { data: activityRows }, { data: orders }, { data: loginRows }] =
     await Promise.all([
       supabase.rpc("get_admin_customers"),
-      supabase.rpc("get_admin_orders"),
+      // Activity numbers are aggregated in the database; only the latest
+      // 20 orders are loaded.
+      supabase.rpc("get_admin_customer_activity", { p_customer_id: id }),
+      supabase.rpc("get_admin_customer_orders", { p_customer_id: id, p_limit: 20 }),
       // Login and password details are OWNER-only (also in the database).
       isOwner
         ? supabase.rpc("get_admin_customer_login", { p_customer_id: id })
@@ -57,9 +68,10 @@ export default async function AdminCustomerDetailPage({
     notFound();
   }
 
-  const customerOrders = (orders ?? []).filter(
-    (order) => order.customer_id === id
-  );
+  const customerOrders = orders ?? [];
+  const activity = activityRows?.[0];
+  const tel = activity?.phone ? phoneHref(activity.phone) : null;
+  const statusText = isArchivedText(customer.archived_at, customer.active);
   const isArchived = customer.archived_at !== null;
   const login = loginRows?.[0];
 
@@ -98,6 +110,57 @@ export default async function AdminCustomerDetailPage({
           Bu müştəri arxivdədir: daxil ola bilmir və məlumatları
           dəyişdirilə bilməz. Davam etmək üçün arxivdən çıxarın.
         </Alert>
+      )}
+
+      {activity && (
+        <section aria-labelledby="activity-title" className="card mb-6 p-5 sm:p-6">
+          <h2 id="activity-title" className="mb-4 font-semibold text-white">
+            Aktivlik
+          </h2>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <Stat label="Qeydiyyat tarixi" value={formatDate(activity.registered_at)} />
+            <Stat
+              label="Son giriş"
+              value={activity.last_sign_in_at ? formatDate(activity.last_sign_in_at) : "Hələ daxil olmayıb"}
+            />
+            <Stat
+              label="Son sifariş"
+              value={activity.last_order_at ? formatDate(activity.last_order_at) : "Sifariş yoxdur"}
+            />
+            <Stat label="Ümumi sifariş sayı" value={String(activity.order_count)} />
+            <Stat label="Təsdiqlənmiş sifariş sayı" value={String(activity.confirmed_order_count)} />
+            <Stat
+              label="Ümumi alış məbləği"
+              value={formatAzn(activity.purchase_total)}
+              hint="Yalnız təsdiqlənmiş sifarişlər"
+            />
+            <div>
+              <dt className="text-zinc-500">Telefon</dt>
+              <dd className="font-medium text-white">
+                {tel ? (
+                  <a href={tel} className="text-amber-400 hover:underline">
+                    {activity.phone}
+                  </a>
+                ) : (
+                  activity.phone ?? "—"
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Email</dt>
+              <dd className="font-medium break-all text-white">
+                {activity.email ? (
+                  <a href={`mailto:${activity.email}`} className="hover:text-amber-400">
+                    {activity.email}
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </dd>
+            </div>
+            <Stat label="Status" value={statusText} />
+          </dl>
+        </section>
       )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -325,7 +388,10 @@ export default async function AdminCustomerDetailPage({
 
       <section className="mt-6">
         <h2 className="mb-3 font-semibold text-white">
-          Sifarişlər ({customerOrders.length})
+          Son sifarişlər
+          {activity && Number(activity.order_count) > customerOrders.length
+            ? ` (son ${customerOrders.length}, cəmi ${activity.order_count})`
+            : ` (${customerOrders.length})`}
         </h2>
 
         {customerOrders.length === 0 ? (
@@ -338,6 +404,7 @@ export default async function AdminCustomerDetailPage({
                   <th>Sifariş</th>
                   <th>Tarix</th>
                   <th>Status</th>
+                  <th>Ödəniş</th>
                   <th className="text-right">Məbləğ</th>
                 </tr>
               </thead>
@@ -356,6 +423,11 @@ export default async function AdminCustomerDetailPage({
                     <td>
                       <Badge tone={orderStatusTones[order.status]}>
                         {orderStatusLabels[order.status]}
+                      </Badge>
+                    </td>
+                    <td>
+                      <Badge tone={paymentBadge(order.payment_status).tone}>
+                        {paymentBadge(order.payment_status).text}
                       </Badge>
                     </td>
                     <td className="text-right font-semibold">
@@ -417,4 +489,18 @@ export default async function AdminCustomerDetailPage({
       )}
     </>
   );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div>
+      <dt className="text-zinc-500">{label}</dt>
+      <dd className="font-medium text-white">{value}</dd>
+      {hint && <dd className="text-xs text-zinc-500">{hint}</dd>}
+    </div>
+  );
+}
+
+function isArchivedText(archivedAt: string | null, active: boolean) {
+  return archivedAt ? "Arxivdə" : active ? "Aktiv" : "Deaktiv";
 }

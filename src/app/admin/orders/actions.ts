@@ -207,3 +207,32 @@ export async function searchOrderProducts(
 
   return data;
 }
+
+// "Ödənişi təsdiqlə" / "Ödəniş təsdiqlənmədi" (OWNER, SALES; checked in
+// the database).
+export async function setOrderPayment(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const orderId = readId(formData, "orderId");
+  const decision = formData.get("decision");
+
+  if (!orderId || (decision !== "paid" && decision !== "rejected")) {
+    return fail("Sifariş məlumatı yanlışdır.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("set_admin_order_payment", {
+    p_order_id: orderId,
+    p_paid: decision === "paid",
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Ödəniş yenilənmədi."));
+  }
+
+  revalidateOrder(orderId);
+
+  return ok(decision === "paid" ? "Ödəniş təsdiqləndi." : "Ödəniş təsdiqlənmədi kimi qeyd olundu.");
+}

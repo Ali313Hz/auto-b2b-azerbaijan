@@ -2,6 +2,7 @@ import type { Database } from "@/types/database.types";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 type PriceGroup = Database["public"]["Enums"]["customer_price_group"];
+export type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
 // Azerbaijani money format "1.234,50 ₼", built by hand: browsers without
 // az-AZ locale data would format differently from the server and break
@@ -56,6 +57,46 @@ export const orderStatusTones: Record<OrderStatus, BadgeTone> = {
   CONFIRMED: "green",
   CANCELLED: "red",
 };
+
+// Payment is separate from the order status. NULL = an older order whose
+// payment was never recorded in the system.
+export const paymentStatusLabels: Record<PaymentStatus, string> = {
+  UNPAID: "Ödənilməyib",
+  CUSTOMER_REPORTED: "Müştəri ödəniş etdiyini bildirib",
+  PAID: "Ödəniş təsdiqlənib",
+  REJECTED: "Ödəniş təsdiqlənmədi",
+};
+
+// Short texts for badges in lists.
+export const paymentStatusBadges: Record<PaymentStatus, string> = {
+  UNPAID: "Ödənilməyib",
+  CUSTOMER_REPORTED: "Ödəniş bildirilib",
+  PAID: "Ödənilib",
+  REJECTED: "Ödəniş təsdiqlənmədi",
+};
+
+export const paymentStatusTones: Record<PaymentStatus, BadgeTone> = {
+  UNPAID: "neutral",
+  CUSTOMER_REPORTED: "blue",
+  PAID: "green",
+  REJECTED: "red",
+};
+
+export const paymentUnknownLabel = "Ödəniş qeyd olunmayıb";
+
+export function paymentBadge(status: PaymentStatus | null) {
+  return status
+    ? { text: paymentStatusBadges[status], tone: paymentStatusTones[status] }
+    : { text: paymentUnknownLabel, tone: "neutral" as BadgeTone };
+}
+
+// "+994 50 111 22 33" -> "tel:+994501112233" (digits and one leading +).
+export function phoneHref(phone: string) {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+
+  return digits.length >= 5 ? `tel:${trimmed.startsWith("+") ? "+" : ""}${digits}` : null;
+}
 
 export const priceGroupLabels: Record<PriceGroup, string> = {
   NORMAL: "Normal",

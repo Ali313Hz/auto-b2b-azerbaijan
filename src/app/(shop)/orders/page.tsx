@@ -8,6 +8,7 @@ import {
   formatDate,
   orderStatusLabels,
   orderStatusTones,
+  paymentBadge,
   shortId,
 } from "@/lib/format";
 
@@ -79,6 +80,11 @@ export default async function OrdersPage() {
                 <Badge tone={orderStatusTones[order.status]}>
                   {orderStatusLabels[order.status]}
                 </Badge>
+                {order.status !== "CANCELLED" && (
+                  <Badge tone={paymentBadge(order.payment_status).tone}>
+                    {paymentBadge(order.payment_status).text}
+                  </Badge>
+                )}
                 <span className="font-semibold whitespace-nowrap text-white">
                   {formatAzn(order.total_amount)}
                 </span>

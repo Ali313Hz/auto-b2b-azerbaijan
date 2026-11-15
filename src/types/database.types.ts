@@ -250,6 +250,10 @@ export type Database = {
           created_at: string
           customer_id: string
           id: string
+          payment_confirmed_at: string | null
+          payment_confirmed_by: string | null
+          payment_reported_at: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
           status: Database["public"]["Enums"]["order_status"]
           total_amount: number
           updated_at: string
@@ -258,6 +262,10 @@ export type Database = {
           created_at?: string
           customer_id: string
           id?: string
+          payment_confirmed_at?: string | null
+          payment_confirmed_by?: string | null
+          payment_reported_at?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
           status?: Database["public"]["Enums"]["order_status"]
           total_amount: number
           updated_at?: string
@@ -266,6 +274,10 @@ export type Database = {
           created_at?: string
           customer_id?: string
           id?: string
+          payment_confirmed_at?: string | null
+          payment_confirmed_by?: string | null
+          payment_reported_at?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
           status?: Database["public"]["Enums"]["order_status"]
           total_amount?: number
           updated_at?: string
@@ -668,9 +680,103 @@ export type Database = {
           active_customers: number
           active_products: number
           low_stock_products: number
+          payment_reported_orders: number
           pending_orders: number
           total_products: number
         }[]
+      }
+      get_admin_orders_page: {
+        Args: {
+          p_page?: number
+          p_page_size?: number
+          p_payment?: string | null
+          p_search?: string | null
+          p_status?: string | null
+        }
+        Returns: {
+          company_name: string | null
+          contact_name: string | null
+          created_at: string
+          customer_id: string
+          email: string | null
+          item_count: number
+          order_id: string
+          payment_reported_at: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          phone: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          total_count: number
+          updated_at: string
+        }[]
+      }
+      get_admin_order_counts: {
+        Args: never
+        Returns: {
+          cancelled: number
+          confirmed: number
+          paid: number
+          payment_reported: number
+          pending: number
+          rejected: number
+          total: number
+          unpaid: number
+        }[]
+      }
+      get_admin_order: {
+        Args: { p_order_id: string }
+        Returns: {
+          company_name: string | null
+          contact_name: string | null
+          created_at: string
+          customer_id: string
+          email: string | null
+          item_count: number
+          order_id: string
+          payment_confirmed_at: string | null
+          payment_confirmed_by_name: string | null
+          payment_reported_at: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          phone: string | null
+          price_group: Database["public"]["Enums"]["customer_price_group"] | null
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at: string
+        }[]
+      }
+      get_admin_customer_activity: {
+        Args: { p_customer_id: string }
+        Returns: {
+          active: boolean
+          archived_at: string | null
+          confirmed_order_count: number
+          email: string | null
+          last_order_at: string | null
+          last_sign_in_at: string | null
+          order_count: number
+          paid_total: number
+          phone: string | null
+          purchase_total: number
+          registered_at: string
+        }[]
+      }
+      get_admin_customer_orders: {
+        Args: { p_customer_id: string; p_limit?: number }
+        Returns: {
+          created_at: string
+          order_id: string
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+        }[]
+      }
+      report_order_payment: {
+        Args: { p_order_id: string }
+        Returns: Database["public"]["Enums"]["payment_status"]
+      }
+      set_admin_order_payment: {
+        Args: { p_order_id: string; p_paid: boolean }
+        Returns: Database["public"]["Enums"]["payment_status"]
       }
       get_admin_product: {
         Args: { p_product_id: string }
@@ -1021,6 +1127,8 @@ export type Database = {
         Returns: {
           created_at: string
           order_id: string
+          payment_reported_at: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
           status: Database["public"]["Enums"]["order_status"]
           total_amount: number
         }[]
@@ -1117,6 +1225,7 @@ export type Database = {
         | "REJECTED"
         | "SUPERSEDED"
       order_status: "PENDING" | "CONFIRMED" | "CANCELLED"
+      payment_status: "UNPAID" | "CUSTOMER_REPORTED" | "PAID" | "REJECTED"
       staff_role:
         | "OWNER"
         | "SALES"
@@ -1262,6 +1371,7 @@ export const Constants = {
         "SUPERSEDED",
       ],
       order_status: ["PENDING", "CONFIRMED", "CANCELLED"],
+      payment_status: ["UNPAID", "CUSTOMER_REPORTED", "PAID", "REJECTED"],
       staff_role: ["OWNER", "SALES", "PRODUCT_MANAGER", "SUPPORT", "WAREHOUSE"],
     },
   },

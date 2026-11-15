@@ -11,7 +11,12 @@ import {
   formatDate,
   orderStatusLabels,
   orderStatusTones,
+  paymentBadge,
+  paymentStatusLabels,
+  paymentUnknownLabel,
+  phoneHref,
   shortId,
+  uuidPattern,
 } from "@/lib/format";
 import {
   describeOrderChange,
@@ -19,7 +24,7 @@ import {
   type OrderChange,
 } from "@/lib/order-changes";
 
-import { updateOrderStatus } from "../actions";
+import { setOrderPayment, updateOrderStatus } from "../actions";
 import OrderEditor, { type OrderLine } from "./OrderEditor";
 
 export const metadata: Metadata = {
@@ -34,20 +39,26 @@ export default async function AdminOrderDetailPage({
   params,
 }: PageProps<"/admin/orders/[id]">) {
   const { id } = await params;
+
+  if (!uuidPattern.test(id)) {
+    notFound();
+  }
+
   const { supabase, role } = await requireStaff("ordersView");
+  const canPayments = can(role, "payments");
   const canProcess = can(role, "ordersProcess");
   const canEdit = can(role, "ordersEdit");
   // WAREHOUSE does not see prices in the history (the database hides them).
   const showPrices = role !== "WAREHOUSE";
 
-  const [{ data: orders }, { data: lineRows, error: linesError }, { data: changeRows, error: changesError }] =
+  const [{ data: orderRows }, { data: lineRows, error: linesError }, { data: changeRows, error: changesError }] =
     await Promise.all([
-      supabase.rpc("get_admin_orders"),
+      supabase.rpc("get_admin_order", { p_order_id: id }),
       supabase.rpc("get_admin_order_lines", { p_order_id: id }),
       supabase.rpc("get_admin_order_changes", { p_order_id: id }),
     ]);
 
-  const order = orders?.find((item) => item.order_id === id);
+  const order = orderRows?.[0];
 
   if (!order) {
     notFound();
@@ -84,6 +95,9 @@ export default async function AdminOrderDetailPage({
   const history = groupOrderChanges(changes);
   const isPending = order.status === "PENDING";
   const fields = { orderId: order.order_id };
+  const payment = paymentBadge(order.payment_status);
+  const tel = order.phone ? phoneHref(order.phone) : null;
+  const isCancelled = order.status === "CANCELLED";
 
   return (
     <>
@@ -98,9 +112,12 @@ export default async function AdminOrderDetailPage({
         title={`Sifariş #${shortId(order.order_id)}`}
         description={`${formatDate(order.created_at)} · ${order.company_name ?? "—"}`}
         actions={
-          <Badge tone={orderStatusTones[order.status]}>
-            {orderStatusLabels[order.status]}
-          </Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={orderStatusTones[order.status]}>
+              {orderStatusLabels[order.status]}
+            </Badge>
+            <Badge tone={payment.tone}>{payment.text}</Badge>
+          </div>
         }
       />
 
@@ -117,7 +134,81 @@ export default async function AdminOrderDetailPage({
               {order.company_name ?? "—"}
             </Link>
             <p className="text-sm text-zinc-300">{order.contact_name ?? "—"}</p>
-            <p className="text-sm break-all text-zinc-500">{order.email ?? "—"}</p>
+            {tel ? (
+              <a
+                href={tel}
+                className="btn btn-secondary mt-3 w-full justify-center text-amber-300"
+              >
+                📞 {order.phone}
+              </a>
+            ) : (
+              order.phone && <p className="mt-2 text-sm text-zinc-300">{order.phone}</p>
+            )}
+            {order.email && (
+              <a
+                href={`mailto:${order.email}`}
+                className="mt-2 block text-sm break-all text-zinc-400 hover:text-zinc-200"
+              >
+                {order.email}
+              </a>
+            )}
+          </section>
+
+          <section
+            className={`card space-y-3 p-5 ${order.payment_status === "CUSTOMER_REPORTED" ? "border-sky-600/80" : ""}`}
+          >
+            <h2 className="text-sm font-semibold tracking-wide text-zinc-400 uppercase">
+              Ödəniş
+            </h2>
+            <p className="font-medium text-white">
+              {order.payment_status ? paymentStatusLabels[order.payment_status] : paymentUnknownLabel}
+            </p>
+            <dl className="space-y-1 text-xs text-zinc-400">
+              {order.payment_reported_at && (
+                <div>
+                  <dt className="inline">Müştəri bildirib: </dt>
+                  <dd className="inline text-zinc-300">{formatDate(order.payment_reported_at)}</dd>
+                </div>
+              )}
+              {order.payment_status === "PAID" && order.payment_confirmed_at && (
+                <div>
+                  <dt className="inline">Təsdiqlədi: </dt>
+                  <dd className="inline text-zinc-300">
+                    {order.payment_confirmed_by_name ?? "—"} · {formatDate(order.payment_confirmed_at)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+
+            {canPayments && !isCancelled && order.payment_status !== "PAID" && (
+              <ConfirmForm
+                action={setOrderPayment}
+                fields={{ ...fields, decision: "paid" }}
+                label="Ödənişi təsdiqlə"
+                question="Ödəniş həqiqətən daxil olub?"
+                description={`${formatAzn(order.total_amount)} ödənilmiş kimi qeyd olunacaq.`}
+                confirmLabel="Bəli, təsdiqlə"
+                pendingText="Təsdiqlənir..."
+                tone="success"
+              />
+            )}
+            {canPayments && !isCancelled && order.payment_status === "CUSTOMER_REPORTED" && (
+              <ConfirmForm
+                action={setOrderPayment}
+                fields={{ ...fields, decision: "rejected" }}
+                label="Ödəniş təsdiqlənmədi"
+                question="Ödəniş tapılmadı?"
+                description="Müştəri “Ödəniş təsdiqlənmədi” görəcək və yenidən bildirə biləcək."
+                confirmLabel="Bəli, təsdiqlənmədi"
+                pendingText="Yadda saxlanılır..."
+                tone="danger"
+              />
+            )}
+            {!canPayments && (
+              <p className="text-xs text-zinc-500">
+                Ödənişi yalnız Sahib və Satış rolları təsdiqləyə bilər.
+              </p>
+            )}
           </section>
 
           <section className="card space-y-3 p-5">

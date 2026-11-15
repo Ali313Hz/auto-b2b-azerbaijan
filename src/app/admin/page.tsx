@@ -28,7 +28,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   // Counts come from one aggregate RPC; only the rows shown are fetched,
   // and only the sections this role may see.
   const [ordersResult, statsResult, lowStockResult] = await Promise.all([
-    showOrders ? supabase.rpc("get_admin_orders") : empty,
+    showOrders
+      ? supabase.rpc("get_admin_orders_page", { p_page: 1, p_page_size: 6, p_status: "PENDING" })
+      : empty,
     supabase.rpc("get_admin_dashboard_stats"),
     showProducts
       ? supabase.rpc("get_admin_products_page", {
@@ -46,15 +48,24 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const hasError =
     ordersResult.error || statsResult.error || lowStockResult.error;
 
-  const pendingOrders = orders.filter((order) => order.status === "PENDING");
+  // Only the 6 newest pending orders are loaded; the count comes from stats.
+  const pendingOrders = orders;
+  const pendingCount = Number(counts?.pending_orders ?? 0);
+  const reportedCount = Number(counts?.payment_reported_orders ?? 0);
   const lowStockCount = counts?.low_stock_products ?? 0;
 
   const stats = [
     showOrders && {
       label: "Gözləyən sifarişlər",
-      value: pendingOrders.length,
+      value: pendingCount,
       href: "/admin/orders?status=PENDING",
-      highlight: pendingOrders.length > 0,
+      highlight: pendingCount > 0,
+    },
+    showOrders && {
+      label: "Ödəniş bildirilib",
+      value: reportedCount,
+      href: "/admin/orders?payment=CUSTOMER_REPORTED",
+      highlight: reportedCount > 0,
     },
     showProducts && {
       label: "Aktiv məhsullar",
@@ -89,7 +100,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         <Alert>Bəzi məlumatlar yüklənmədi. Səhifəni yeniləyin.</Alert>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {stats.map((stat) => (
           <Link
             key={stat.label}

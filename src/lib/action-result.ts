@@ -72,6 +72,10 @@ const dbMessages: Record<string, string> = {
   "Invalid colour": "Rəng yanlışdır.",
   "Only main categories have a colour":
     "Rəng yalnız əsas kateqoriyaya verilir; alt kateqoriyalar onun açıq çalarını alır.",
+  "Payment already confirmed": "Ödəniş artıq təsdiqlənib.",
+  "No payment report to reject":
+    "Müştəri ödəniş bildirməyib; rədd ediləcək bir şey yoxdur.",
+  "Invalid payment decision": "Seçim yanlışdır.",
   "Stock cannot be negative": "Stok 0 və ya daha böyük tam ədəd olmalıdır.",
 };
 

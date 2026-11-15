@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import ConfirmForm from "@/components/ConfirmForm";
 import { Alert, Badge, PageHeader } from "@/components/ui";
 import { requireCustomer } from "@/lib/auth";
 import {
@@ -9,6 +10,9 @@ import {
   formatDate,
   orderStatusLabels,
   orderStatusTones,
+  paymentBadge,
+  paymentStatusLabels,
+  paymentUnknownLabel,
   shortId,
 } from "@/lib/format";
 import {
@@ -16,6 +20,8 @@ import {
   groupOrderChanges,
   type OrderChangeGroup,
 } from "@/lib/order-changes";
+
+import { reportPayment } from "../actions";
 
 export const metadata: Metadata = {
   title: "Sifariş",
@@ -42,6 +48,15 @@ export default async function OrderDetailPage({
     notFound();
   }
 
+  // "Ödənişi etdim" is offered until the customer reported it or the seller
+  // confirmed it; never for a cancelled order.
+  const canReport =
+    order.status !== "CANCELLED" &&
+    (order.payment_status === null ||
+      order.payment_status === "UNPAID" ||
+      order.payment_status === "REJECTED");
+  const payment = paymentBadge(order.payment_status);
+
   const groups = groupOrderChanges(changes ?? []).filter((group) => group.rows.length > 0);
   const [latest, ...older] = groups;
 
@@ -65,11 +80,57 @@ export default async function OrderDetailPage({
         title={`Sifariş #${shortId(order.order_id)}`}
         description={formatDate(order.created_at)}
         actions={
-          <Badge tone={orderStatusTones[order.status]}>
-            {orderStatusLabels[order.status]}
-          </Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={orderStatusTones[order.status]}>
+              {orderStatusLabels[order.status]}
+            </Badge>
+            <Badge tone={payment.tone}>{payment.text}</Badge>
+          </div>
         }
       />
+
+      {order.status !== "CANCELLED" && (
+        <section aria-labelledby="payment-title" className="card mb-6 p-4 sm:p-5">
+          <h2 id="payment-title" className="font-semibold text-white">
+            Ödəniş
+          </h2>
+          <p className="mt-1 text-sm text-zinc-300">
+            {order.payment_status ? paymentStatusLabels[order.payment_status] : paymentUnknownLabel}
+            {order.payment_status === "CUSTOMER_REPORTED" && order.payment_reported_at
+              ? ` · ${formatDate(order.payment_reported_at)}`
+              : ""}
+          </p>
+
+          {order.payment_status === "CUSTOMER_REPORTED" && (
+            <p role="status" className="mt-2 text-sm text-sky-300">
+              Ödəniş məlumatı satıcıya göndərildi. Satıcı yoxladıqdan sonra təsdiqlənəcək.
+            </p>
+          )}
+          {order.payment_status === "PAID" && (
+            <p className="mt-2 text-sm text-emerald-300">Satıcı ödənişi təsdiqləyib. Təşəkkür edirik!</p>
+          )}
+          {order.payment_status === "REJECTED" && (
+            <p className="mt-2 text-sm text-red-300">
+              Satıcı ödənişi tapa bilmədi. Ödəniş etmisinizsə, satıcı ilə əlaqə saxlayın və ya yenidən bildirin.
+            </p>
+          )}
+
+          {canReport && (
+            <ConfirmForm
+              action={reportPayment}
+              fields={{ orderId: order.order_id }}
+              label="Ödənişi etdim"
+              question="Ödəniş etdiyinizi satıcıya bildirək?"
+              description={`Məbləğ: ${formatAzn(order.total_amount)}. Bu, yalnız satıcıya xəbərdir — satıcı ödənişi yoxlayıb təsdiqləyəcək.`}
+              confirmLabel="Bəli, bildir"
+              cancelLabel="Ləğv et"
+              pendingText="Göndərilir..."
+              tone="success"
+              className="mt-3 sm:max-w-sm"
+            />
+          )}
+        </section>
+      )}
 
       {latest && (
         <section
