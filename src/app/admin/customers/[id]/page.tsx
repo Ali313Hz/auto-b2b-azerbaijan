@@ -421,6 +421,7 @@ export default async function AdminCustomerDetailPage({
                     </td>
                     <td className="text-zinc-400">{formatDate(order.created_at)}</td>
                     <td>
+                      {order.order_type === "PREORDER" && <Badge tone="blue">ÖN SİFARİŞ</Badge>}
                       <Badge tone={orderStatusTones[order.status]}>
                         {orderStatusLabels[order.status]}
                       </Badge>

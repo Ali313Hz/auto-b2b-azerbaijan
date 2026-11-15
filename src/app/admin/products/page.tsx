@@ -24,7 +24,10 @@ export default async function AdminProductsPage({
       ? params.category
       : "";
   const statusFilter =
-    params.status === "active" || params.status === "inactive" || params.status === "sale"
+    params.status === "active" ||
+    params.status === "inactive" ||
+    params.status === "sale" ||
+    params.status === "coming_soon"
       ? params.status
       : "";
   const lowStockOnly = params.stock === "low";
@@ -133,6 +136,7 @@ export default async function AdminProductsPage({
             <option value="active">Aktiv</option>
             <option value="inactive">Deaktiv</option>
             {canEdit && <option value="sale">Endirimdə</option>}
+            <option value="coming_soon">Tezliklə stokda</option>
           </select>
         </div>
 
@@ -180,11 +184,14 @@ export default async function AdminProductsPage({
                       <p className="font-medium break-words text-white">{product.name}</p>
                       <p className="font-mono text-xs text-zinc-500">{product.sku}</p>
                     </div>
-                    {product.active ? (
-                      <Badge tone="green">Aktiv</Badge>
-                    ) : (
-                      <Badge tone="red">Deaktiv</Badge>
-                    )}
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {product.active ? (
+                        <Badge tone="green">Aktiv</Badge>
+                      ) : (
+                        <Badge tone="red">Deaktiv</Badge>
+                      )}
+                      {product.availability === "COMING_SOON" && <Badge tone="blue">Tezliklə</Badge>}
+                    </div>
                   </div>
                   <p className="text-sm text-zinc-400">{product.category_name ?? "—"}</p>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -253,11 +260,16 @@ export default async function AdminProductsPage({
                       </td>
                     )}
                     <td>
-                      {product.active ? (
-                        <Badge tone="green">Aktiv</Badge>
-                      ) : (
-                        <Badge tone="red">Deaktiv</Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {product.active ? (
+                          <Badge tone="green">Aktiv</Badge>
+                        ) : (
+                          <Badge tone="red">Deaktiv</Badge>
+                        )}
+                        {product.availability === "COMING_SOON" && (
+                          <Badge tone="blue">Tezliklə stokda</Badge>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

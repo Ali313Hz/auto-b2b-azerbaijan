@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 const PAGE_SIZE = 30;
 const STATUSES = ["PENDING", "CONFIRMED", "CANCELLED"] as const;
 const PAYMENTS = ["CUSTOMER_REPORTED", "UNPAID", "PAID", "REJECTED", "UNKNOWN"] as const;
+const TYPES = ["STANDARD", "PREORDER"] as const;
 
 const paymentTabs: { value: (typeof PAYMENTS)[number]; label: string }[] = [
   { value: "CUSTOMER_REPORTED", label: "Ödəniş bildirilib" },
@@ -36,6 +37,7 @@ export default async function AdminOrdersPage({
   const params = await searchParams;
   const status = STATUSES.find((value) => value === params.status) ?? "";
   const payment = PAYMENTS.find((value) => value === params.payment) ?? "";
+  const type = TYPES.find((value) => value === params.type) ?? "";
   const query = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
   const page = readPage(params.page);
 
@@ -49,6 +51,7 @@ export default async function AdminOrdersPage({
       p_status: status || null,
       p_payment: payment || null,
       p_search: query || null,
+      p_type: type || null,
     }),
     supabase.rpc("get_admin_order_counts"),
   ]);
@@ -65,9 +68,10 @@ export default async function AdminOrdersPage({
   const rows = orders ?? [];
   const total = Number(rows[0]?.total_count ?? 0);
   const counts = countRows?.[0];
-  const filters: Record<"status" | "payment" | "q", string | undefined> = {
+  const filters: Record<"status" | "payment" | "type" | "q", string | undefined> = {
     status: status || undefined,
     payment: payment || undefined,
+    type: type || undefined,
     q: query || undefined,
   };
   const href = (next: Partial<typeof filters>) => pageHref("/admin/orders", { ...filters, ...next }, 1);
@@ -85,6 +89,12 @@ export default async function AdminOrdersPage({
     REJECTED: counts?.rejected,
   };
   const reported = Number(counts?.payment_reported ?? 0);
+  const typeTabs = [
+    { value: "", label: "Hamısı", count: counts?.total },
+    { value: "STANDARD", label: "Normal", count: counts?.standard },
+    { value: "PREORDER", label: "Ön sifariş", count: counts?.preorder },
+  ];
+  const filtered = Boolean(status || payment || type || query);
 
   return (
     <>
@@ -107,6 +117,19 @@ export default async function AdminOrdersPage({
           </span>
         </Link>
       )}
+
+      <nav aria-label="Sifariş növü" className="-mx-1 mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
+        {typeTabs.map((tab) => (
+          <Link
+            key={tab.value}
+            href={href({ type: tab.value || undefined })}
+            className={`btn btn-sm whitespace-nowrap ${type === tab.value ? "btn-primary" : "btn-secondary"}`}
+          >
+            {tab.label}
+            <span className="opacity-70">{tab.count ?? ""}</span>
+          </Link>
+        ))}
+      </nav>
 
       <nav aria-label="Status filtri" className="-mx-1 mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
         {statusTabs.map((tab) => (
@@ -149,6 +172,7 @@ export default async function AdminOrdersPage({
       <form action="/admin/orders" className="mb-4 flex gap-2">
         {status && <input type="hidden" name="status" value={status} />}
         {payment && <input type="hidden" name="payment" value={payment} />}
+        {type && <input type="hidden" name="type" value={type} />}
         <label htmlFor="order-search" className="sr-only">
           Sifariş axtar
         </label>
@@ -168,9 +192,9 @@ export default async function AdminOrdersPage({
 
       {rows.length === 0 ? (
         <EmptyState
-          title={status || payment || query ? "Uyğun sifariş yoxdur" : "Hələ sifariş yoxdur"}
+          title={filtered ? "Uyğun sifariş yoxdur" : "Hələ sifariş yoxdur"}
           action={
-            status || payment || query ? (
+            filtered ? (
               <Link href="/admin/orders" className="btn btn-secondary">
                 Filtrləri sıfırla
               </Link>
@@ -201,6 +225,7 @@ export default async function AdminOrdersPage({
                       <p className="shrink-0 font-semibold text-white">{formatAzn(order.total_amount)}</p>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
+                      {order.order_type === "PREORDER" && <Badge tone="blue">ÖN SİFARİŞ</Badge>}
                       <Badge tone={orderStatusTones[order.status]}>{orderStatusLabels[order.status]}</Badge>
                       <Badge tone={paid.tone}>{paid.text}</Badge>
                       <span className="text-xs text-zinc-500">{order.item_count} məhsul</span>
@@ -275,7 +300,8 @@ export default async function AdminOrdersPage({
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-1">
-                          <Badge tone={orderStatusTones[order.status]}>{orderStatusLabels[order.status]}</Badge>
+                          {order.order_type === "PREORDER" && <Badge tone="blue">ÖN SİFARİŞ</Badge>}
+                      <Badge tone={orderStatusTones[order.status]}>{orderStatusLabels[order.status]}</Badge>
                           <Badge tone={paid.tone}>{paid.text}</Badge>
                         </div>
                       </td>

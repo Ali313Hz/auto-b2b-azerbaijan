@@ -14,6 +14,10 @@ export function fail(message: string): ActionResult {
 const dbMessages: Record<string, string> = {
   "Insufficient stock": "Stokda kifayət qədər məhsul yoxdur.",
   "Cart is empty": "Səbət boşdur.",
+  "Invalid order type": "Yanlış sorğu.",
+  "Invalid availability": "Məhsulun vəziyyətini seçin.",
+  "Only coming soon products can be pre-ordered":
+    "Ön sifarişə yalnız \"Tezliklə stokda\" olan məhsullar əlavə oluna bilər.",
   "Cart contains unavailable product":
     "Səbətdə artıq satışda olmayan məhsul var. Onu silib yenidən cəhd edin.",
   "Product not found": "Məhsul tapılmadı və ya satışda deyil.",

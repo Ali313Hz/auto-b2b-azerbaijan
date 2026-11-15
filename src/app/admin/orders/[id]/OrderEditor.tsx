@@ -48,15 +48,18 @@ function fromLines(lines: OrderLine[]): EditorItem[] {
 
 // Edits a PENDING order in place (OWNER, SALES). Saving changes the order,
 // moves stock by the difference and writes the change history; the
-// database recalculates every total.
+// database recalculates every total. A pre-order takes no stock, so there
+// is no stock limit (only "Tezliklə stokda" products can be added).
 export default function OrderEditor({
   orderId,
   updatedAt,
   lines,
+  preorder = false,
 }: {
   orderId: string;
   updatedAt: string;
   lines: OrderLine[];
+  preorder?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(saveOrderItems, null);
   const [items, setItems] = useState<EditorItem[]>(() => fromLines(lines));
@@ -153,7 +156,7 @@ export default function OrderEditor({
       price,
       total: valid ? Math.round(quantity * price * 100) / 100 : null,
       old,
-      tooMuch: valid && available !== null && quantity > available,
+      tooMuch: !preorder && valid && available !== null && quantity > available,
       available,
     };
   });

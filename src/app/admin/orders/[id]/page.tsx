@@ -113,6 +113,7 @@ export default async function AdminOrderDetailPage({
         description={`${formatDate(order.created_at)} · ${order.company_name ?? "—"}`}
         actions={
           <div className="flex flex-wrap gap-2">
+            {order.order_type === "PREORDER" && <Badge tone="blue">ÖN SİFARİŞ</Badge>}
             <Badge tone={orderStatusTones[order.status]}>
               {orderStatusLabels[order.status]}
             </Badge>
@@ -254,10 +255,21 @@ export default async function AdminOrderDetailPage({
         </aside>
 
         <div className="min-w-0 space-y-6">
+          {order.order_type === "PREORDER" && (
+            <Alert tone="blue">
+              Ön sifariş: məhsul hələ stokda deyil. Bu sifariş stokdan heç nə götürmür, ləğv edildikdə
+              də stoka heç nə qaytarılmır.
+            </Alert>
+          )}
           {linesError ? (
             <Alert>Sifariş məhsulları yüklənmədi.</Alert>
           ) : isPending && canEdit ? (
-            <OrderEditor orderId={order.order_id} updatedAt={order.updated_at} lines={lines} />
+            <OrderEditor
+              orderId={order.order_id}
+              updatedAt={order.updated_at}
+              lines={lines}
+              preorder={order.order_type === "PREORDER"}
+            />
           ) : (
             <section className="card p-4 sm:p-6">
               <div className="flex flex-wrap items-baseline justify-between gap-2">

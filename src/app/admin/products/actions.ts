@@ -103,7 +103,7 @@ function parseStockAndPrices(
 }
 
 export type CreateProductDraftResult =
-  | { ok: true; productId: string; contentSaved: boolean }
+  | { ok: true; productId: string; contentSaved: boolean; availabilitySaved: boolean }
   | { ok: false; message: string };
 
 // Step 1 of the visual create screen: the product is always created
@@ -116,7 +116,12 @@ export async function createProductDraft(
   const name = readText(formData, "name");
   const description = readText(formData, "description") ?? "";
   const categoryId = readText(formData, "categoryId");
+  const availability = readText(formData, "availability") || "IN_STOCK";
   const numbers = parseStockAndPrices(formData);
+
+  if (availability !== "IN_STOCK" && availability !== "COMING_SOON") {
+    return { ok: false, message: "Məhsulun vəziyyətini seçin." };
+  }
 
   if (!sku || !name || !categoryId) {
     return { ok: false, message: "Ad, SKU və kateqoriya mütləqdir." };
@@ -157,9 +162,58 @@ export async function createProductDraft(
     }
   );
 
+  // New products are IN_STOCK; "Tezliklə stokda" is one more call.
+  let availabilitySaved = true;
+
+  if (availability === "COMING_SOON") {
+    const { error: availabilityError } = await supabase.rpc("set_admin_product_availability", {
+      p_product_id: productId,
+      p_availability: "COMING_SOON",
+    });
+
+    availabilitySaved = !availabilityError;
+  }
+
   revalidateProductPaths(productId);
 
-  return { ok: true, productId, contentSaved: !contentError };
+  return { ok: true, productId, contentSaved: !contentError, availabilitySaved };
+}
+
+// "Stokda" <-> "Tezliklə stokda" (OWNER, PRODUCT_MANAGER; checked again in
+// the database).
+export async function updateProductAvailability(
+  _state: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const productId = readText(formData, "productId");
+  const availability = readText(formData, "availability");
+
+  if (!productId || !uuidPattern.test(productId)) {
+    return fail("Məhsul məlumatı yanlışdır.");
+  }
+
+  if (availability !== "IN_STOCK" && availability !== "COMING_SOON") {
+    return fail("Məhsulun vəziyyətini seçin.");
+  }
+
+  const supabase = await getAuthedClient();
+
+  const { error } = await supabase.rpc("set_admin_product_availability", {
+    p_product_id: productId,
+    p_availability: availability,
+  });
+
+  if (error) {
+    return fail(dbErrorMessage(error, "Məhsulun vəziyyəti dəyişdirilmədi."));
+  }
+
+  revalidateProductPaths(productId);
+
+  return ok(
+    availability === "COMING_SOON"
+      ? "Məhsul “Tezliklə stokda” edildi. Müştərilər ön sifariş verə bilər."
+      : "Məhsul “Stokda” edildi."
+  );
 }
 
 export async function updateProduct(

@@ -250,6 +250,7 @@ export type Database = {
           created_at: string
           customer_id: string
           id: string
+          order_type: Database["public"]["Enums"]["order_type"]
           payment_confirmed_at: string | null
           payment_confirmed_by: string | null
           payment_reported_at: string | null
@@ -262,6 +263,7 @@ export type Database = {
           created_at?: string
           customer_id: string
           id?: string
+          order_type?: Database["public"]["Enums"]["order_type"]
           payment_confirmed_at?: string | null
           payment_confirmed_by?: string | null
           payment_reported_at?: string | null
@@ -274,6 +276,7 @@ export type Database = {
           created_at?: string
           customer_id?: string
           id?: string
+          order_type?: Database["public"]["Enums"]["order_type"]
           payment_confirmed_at?: string | null
           payment_confirmed_by?: string | null
           payment_reported_at?: string | null
@@ -404,6 +407,7 @@ export type Database = {
       products: {
         Row: {
           active: boolean
+          availability: Database["public"]["Enums"]["product_availability"]
           category_id: string | null
           created_at: string
           description: string | null
@@ -415,6 +419,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          availability?: Database["public"]["Enums"]["product_availability"]
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -426,6 +431,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          availability?: Database["public"]["Enums"]["product_availability"]
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -692,6 +698,7 @@ export type Database = {
           p_payment?: string | null
           p_search?: string | null
           p_status?: string | null
+          p_type?: string | null
         }
         Returns: {
           company_name: string | null
@@ -701,6 +708,7 @@ export type Database = {
           email: string | null
           item_count: number
           order_id: string
+          order_type: Database["public"]["Enums"]["order_type"]
           payment_reported_at: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           phone: string | null
@@ -718,7 +726,9 @@ export type Database = {
           paid: number
           payment_reported: number
           pending: number
+          preorder: number
           rejected: number
+          standard: number
           total: number
           unpaid: number
         }[]
@@ -733,6 +743,7 @@ export type Database = {
           email: string | null
           item_count: number
           order_id: string
+          order_type: Database["public"]["Enums"]["order_type"]
           payment_confirmed_at: string | null
           payment_confirmed_by_name: string | null
           payment_reported_at: string | null
@@ -765,6 +776,7 @@ export type Database = {
         Returns: {
           created_at: string
           order_id: string
+          order_type: Database["public"]["Enums"]["order_type"]
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           status: Database["public"]["Enums"]["order_status"]
           total_amount: number
@@ -782,6 +794,7 @@ export type Database = {
         Args: { p_page?: number; p_page_size?: number }
         Returns: {
           available: boolean
+          availability: Database["public"]["Enums"]["product_availability"]
           category_name: string | null
           favorited_at: string
           id: string
@@ -807,6 +820,7 @@ export type Database = {
         Args: { p_product_id: string }
         Returns: {
           active: boolean
+          availability: Database["public"]["Enums"]["product_availability"]
           category_id: string | null
           category_name: string | null
           dealer_price: number | null
@@ -832,6 +846,7 @@ export type Database = {
         }
         Returns: {
           active: boolean
+          availability: Database["public"]["Enums"]["product_availability"]
           category_id: string | null
           category_name: string | null
           has_group_prices: boolean | null
@@ -856,6 +871,7 @@ export type Database = {
           p_sort?: string
         }
         Returns: {
+          availability: Database["public"]["Enums"]["product_availability"]
           category_id: string | null
           category_name: string | null
           category_slug: string | null
@@ -885,6 +901,7 @@ export type Database = {
       get_customer_product: {
         Args: { p_product_id: string }
         Returns: {
+          availability: Database["public"]["Enums"]["product_availability"]
           category_id: string | null
           category_name: string | null
           category_slug: string | null
@@ -1019,7 +1036,19 @@ export type Database = {
         }
         Returns: string
       }
-      create_order_from_cart: { Args: never; Returns: string }
+      create_order_from_cart:
+        | { Args: never; Returns: string }
+        | {
+            Args: { p_order_type: Database["public"]["Enums"]["order_type"] }
+            Returns: string
+          }
+      set_admin_product_availability: {
+        Args: {
+          p_availability: Database["public"]["Enums"]["product_availability"]
+          p_product_id: string
+        }
+        Returns: undefined
+      }
       delete_admin_product_media: {
         Args: { p_media_id: string }
         Returns: string
@@ -1127,6 +1156,7 @@ export type Database = {
         Args: never
         Returns: {
           available: boolean
+          is_preorder: boolean
           line_total: number
           name: string
           product_id: string
@@ -1152,6 +1182,7 @@ export type Database = {
         Returns: {
           created_at: string
           order_id: string
+          order_type: Database["public"]["Enums"]["order_type"]
           payment_reported_at: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           status: Database["public"]["Enums"]["order_status"]
@@ -1250,7 +1281,9 @@ export type Database = {
         | "REJECTED"
         | "SUPERSEDED"
       order_status: "PENDING" | "CONFIRMED" | "CANCELLED"
+      order_type: "STANDARD" | "PREORDER"
       payment_status: "UNPAID" | "CUSTOMER_REPORTED" | "PAID" | "REJECTED"
+      product_availability: "IN_STOCK" | "COMING_SOON"
       staff_role:
         | "OWNER"
         | "SALES"
@@ -1396,7 +1429,9 @@ export const Constants = {
         "SUPERSEDED",
       ],
       order_status: ["PENDING", "CONFIRMED", "CANCELLED"],
+      order_type: ["STANDARD", "PREORDER"],
       payment_status: ["UNPAID", "CUSTOMER_REPORTED", "PAID", "REJECTED"],
+      product_availability: ["IN_STOCK", "COMING_SOON"],
       staff_role: ["OWNER", "SALES", "PRODUCT_MANAGER", "SUPPORT", "WAREHOUSE"],
     },
   },

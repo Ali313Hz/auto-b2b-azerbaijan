@@ -98,7 +98,9 @@ export default async function ProductDetailPage({
             {product.on_sale && <Badge tone="red">ENDİRİM</Badge>}
             {product.category_name && <Badge>{product.category_name}</Badge>}
 
-            {product.stock > 0 ? (
+            {product.availability === "COMING_SOON" ? (
+              <Badge tone="blue">TEZLİKLƏ STOKDA</Badge>
+            ) : product.stock > 0 ? (
               <Badge tone="green">Stokda: {product.stock} əd.</Badge>
             ) : (
               <Badge tone="red">Stokda yoxdur</Badge>
@@ -139,7 +141,11 @@ export default async function ProductDetailPage({
             )}
 
             <div className="mt-4">
-              <AddToCartForm productId={product.id} stock={product.stock} />
+              <AddToCartForm
+                productId={product.id}
+                stock={product.stock}
+                comingSoon={product.availability === "COMING_SOON"}
+              />
             </div>
           </div>
 

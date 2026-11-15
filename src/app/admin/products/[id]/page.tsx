@@ -16,6 +16,7 @@ import {
   setProductPrimaryImage,
   updateProduct,
   updateProductActive,
+  updateProductAvailability,
   updateProductContent,
   updateProductStock,
 } from "../actions";
@@ -163,6 +164,9 @@ export default async function AdminProductDetailPage({
               <Badge tone="green">Aktiv · satışda</Badge>
             ) : (
               <Badge tone="red">Deaktiv · gizli</Badge>
+            )}
+            {product.availability === "COMING_SOON" && (
+              <Badge tone="blue">TEZLİKLƏ STOKDA</Badge>
             )}
             {product.sale_price !== null && (
               <Badge tone="red">Endirim: {formatAzn(product.sale_price)}</Badge>
@@ -460,6 +464,49 @@ export default async function AdminProductDetailPage({
               {product.active ? "Deaktiv et (satışdan çıxar)" : "Aktiv et (satışa çıxar)"}
             </SubmitButton>
           </ActionForm>
+
+          <div className="border-t border-zinc-800 pt-4">
+            <h3 className="font-semibold text-white">Mövcudluq</h3>
+            <p className="mt-1 text-sm text-zinc-400">
+              {product.availability === "COMING_SOON"
+                ? "Tezliklə stokda: müştərilər stok olmasa da ön sifariş verə bilir. Ön sifariş stokdan heç nə götürmür."
+                : "Stokda: müştərilər yalnız stokda olan qədər sifariş verə bilir."}
+            </p>
+            <ActionForm action={updateProductAvailability} className="mt-3 space-y-3">
+              <input type="hidden" name="productId" value={product.id} />
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Mövcudluq">
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border-2 border-zinc-800 p-3 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/30">
+                  <input
+                    type="radio"
+                    name="availability"
+                    value="IN_STOCK"
+                    defaultChecked={product.availability !== "COMING_SOON"}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-semibold text-white">Stokda</span>
+                    <span className="block text-xs text-zinc-400">Stok qədər sifariş</span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border-2 border-zinc-800 p-3 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-950/30">
+                  <input
+                    type="radio"
+                    name="availability"
+                    value="COMING_SOON"
+                    defaultChecked={product.availability === "COMING_SOON"}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-semibold text-white">Tezliklə stokda</span>
+                    <span className="block text-xs text-zinc-400">Ön sifariş qəbul olunur</span>
+                  </span>
+                </label>
+              </div>
+              <SubmitButton className="btn btn-secondary w-full" pendingText="Yadda saxlanılır...">
+                Mövcudluğu yadda saxla
+              </SubmitButton>
+            </ActionForm>
+          </div>
 
           <p className="text-xs text-zinc-500">
             Məhsullar sifariş tarixçəsini qorumaq üçün silinmir. Satışdan

@@ -80,13 +80,14 @@ export function Alert({
   tone = "red",
   children,
 }: {
-  tone?: "red" | "green" | "amber";
+  tone?: "red" | "green" | "amber" | "blue";
   children: React.ReactNode;
 }) {
   const tones = {
     red: "border-red-800/60 bg-red-950/40 text-red-200",
     green: "border-emerald-800/60 bg-emerald-950/40 text-emerald-200",
     amber: "border-amber-800/60 bg-amber-950/40 text-amber-200",
+    blue: "border-sky-800/60 bg-sky-950/40 text-sky-200",
   };
 
   return (

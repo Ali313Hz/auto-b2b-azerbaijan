@@ -103,6 +103,7 @@ export default async function FavoritesPage({ searchParams }: PageProps<"/favori
                       <>
                         {item.category_name && <Badge>{item.category_name}</Badge>}
                         {item.on_sale && <Badge tone="red">ENDİRİM</Badge>}
+                        {item.availability === "COMING_SOON" && <Badge tone="blue">TEZLİKLƏ STOKDA</Badge>}
                       </>
                     )}
                   </div>
@@ -130,7 +131,11 @@ export default async function FavoritesPage({ searchParams }: PageProps<"/favori
                       ) : (
                         <p className="mt-auto text-xl font-bold text-amber-400">{formatAzn(item.price)}</p>
                       )}
-                      <AddToCartForm productId={item.id} stock={item.stock ?? 0} />
+                      <AddToCartForm
+                        productId={item.id}
+                        stock={item.stock ?? 0}
+                        comingSoon={item.availability === "COMING_SOON"}
+                      />
                     </>
                   )}
                   {!item.available && (

@@ -81,6 +81,7 @@ export default async function OrderDetailPage({
         description={formatDate(order.created_at)}
         actions={
           <div className="flex flex-wrap gap-2">
+            {order.order_type === "PREORDER" && <Badge tone="blue">ÖN SİFARİŞ</Badge>}
             <Badge tone={orderStatusTones[order.status]}>
               {orderStatusLabels[order.status]}
             </Badge>

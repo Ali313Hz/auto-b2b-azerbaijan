@@ -81,16 +81,23 @@ export async function removeFromCart(
   return ok("Məhsul səbətdən silindi.");
 }
 
+// One order from one part of the cart: the normal part (in stock) or the
+// pre-order part. Which line belongs where is decided by the database.
 export async function createOrder(
   _state: ActionResult,
-  _formData: FormData
+  formData: FormData
 ): Promise<ActionResult> {
-  void _formData;
+  const orderType = formData.get("orderType");
+
+  if (orderType !== "STANDARD" && orderType !== "PREORDER") {
+    return fail("Yanlış sorğu.");
+  }
 
   const supabase = await getAuthedClient();
 
   const { data: orderId, error } = await supabase.rpc(
-    "create_order_from_cart"
+    "create_order_from_cart",
+    { p_order_type: orderType }
   );
 
   if (error || !orderId) {

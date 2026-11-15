@@ -153,6 +153,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      {order.order_type === "PREORDER" && <Badge tone="blue">ÖN SİFARİŞ</Badge>}
                       <Badge tone={orderStatusTones[order.status]}>
                         {orderStatusLabels[order.status]}
                       </Badge>

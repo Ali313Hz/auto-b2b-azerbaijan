@@ -77,6 +77,7 @@ export default async function OrdersPage() {
                 {changed.has(order.order_id) && (
                   <Badge tone="amber">Dəyişiklik var · cavabınızı gözləyir</Badge>
                 )}
+                {order.order_type === "PREORDER" && <Badge tone="blue">ÖN SİFARİŞ</Badge>}
                 <Badge tone={orderStatusTones[order.status]}>
                   {orderStatusLabels[order.status]}
                 </Badge>

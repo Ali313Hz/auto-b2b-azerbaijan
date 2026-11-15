@@ -338,7 +338,9 @@ export default async function ProductsPage({
                       <Badge>{product.category_name}</Badge>
                     )}
 
-                    {product.stock > 0 ? (
+                    {product.availability === "COMING_SOON" ? (
+                      <Badge tone="blue">TEZLİKLƏ STOKDA</Badge>
+                    ) : product.stock > 0 ? (
                       <Badge tone="green">Stokda: {product.stock}</Badge>
                     ) : (
                       <Badge tone="red">Stokda yoxdur</Badge>
@@ -363,6 +365,7 @@ export default async function ProductsPage({
                   <AddToCartForm
                     productId={product.id}
                     stock={product.stock}
+                    comingSoon={product.availability === "COMING_SOON"}
                   />
                 </div>
               </li>

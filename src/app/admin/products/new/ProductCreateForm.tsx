@@ -73,6 +73,7 @@ export default function ProductCreateForm({
   const [stock, setStock] = useState("");
   const [prices, setPrices] = useState<PriceState>(emptyPrices);
   const [active, setActive] = useState(true);
+  const [comingSoon, setComingSoon] = useState(false);
 
   const [images, setImages] = useState<PickedFile[]>([]);
   const [primaryKey, setPrimaryKey] = useState<string | null>(null);
@@ -174,6 +175,7 @@ export default function ProductCreateForm({
     formData.set("vipPrice", prices.vip.trim());
     formData.set("onSale", prices.onSale ? "1" : "");
     formData.set("salePrice", prices.sale.trim());
+    formData.set("availability", comingSoon ? "COMING_SOON" : "IN_STOCK");
 
     let created: Awaited<ReturnType<typeof createProductDraft>>;
 
@@ -195,6 +197,10 @@ export default function ProductCreateForm({
 
     if (!created.contentSaved) {
       problems.push("Məhsulun adı və ya təsviri yadda saxlanmadı.");
+    }
+
+    if (!created.availabilitySaved) {
+      problems.push("“Tezliklə stokda” seçimi yadda saxlanmadı. Məhsul səhifəsində yenidən seçin.");
     }
 
     // The first uploaded image becomes the main image, so the chosen main
@@ -271,6 +277,7 @@ export default function ProductCreateForm({
     { label: "Məhsul adı", value: name.trim() || "—" },
     { label: "Kateqoriya", value: category ? categoryPath(category.path) : "—" },
     { label: "Stok", value: stock.trim() ? `${stock.trim()} əd.` : "—" },
+    { label: "Mövcudluq", value: comingSoon ? "Tezliklə stokda (ön sifariş)" : "Stokda" },
     { label: "Normal qiymət", value: prices.normal.trim() ? formatAzn(prices.normal) : "—" },
     ...(prices.onSale
       ? [{ label: "Endirimli qiymət", value: prices.sale.trim() ? formatAzn(prices.sale) : "—" }]
@@ -409,6 +416,26 @@ export default function ProductCreateForm({
                   title="Deaktiv"
                   text="Gizli"
                   tone="zinc"
+                />
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <span className="label">Mövcudluq</span>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mövcudluq">
+                <StatusChoice
+                  checked={!comingSoon}
+                  onSelect={() => setComingSoon(false)}
+                  title="Stokda"
+                  text="Stok qədər sifariş"
+                  tone="green"
+                />
+                <StatusChoice
+                  checked={comingSoon}
+                  onSelect={() => setComingSoon(true)}
+                  title="Tezliklə stokda"
+                  text="Ön sifariş qəbul olunur"
+                  tone="sky"
                 />
               </div>
             </div>
@@ -621,12 +648,14 @@ function StatusChoice({
   onSelect: () => void;
   title: string;
   text: string;
-  tone: "green" | "zinc";
+  tone: "green" | "zinc" | "sky";
 }) {
   const activeClass =
     tone === "green"
       ? "border-emerald-500 bg-emerald-950/40 text-emerald-300"
-      : "border-zinc-400 bg-zinc-800 text-zinc-100";
+      : tone === "sky"
+        ? "border-sky-500 bg-sky-950/40 text-sky-200"
+        : "border-zinc-400 bg-zinc-800 text-zinc-100";
 
   return (
     <button
