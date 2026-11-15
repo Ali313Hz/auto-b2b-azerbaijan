@@ -14,15 +14,35 @@ type Props = {
   // Categories only (no products), already in the admin's order.
   categories: SidebarCategory[];
   selectedSlug: string;
-  // Link for a category ("" = all categories), keeping the other filters.
-  hrefs: Record<string, string>;
-  allHref: string;
+  // The other catalog filters, kept when a category is picked.
+  linkParams: Record<string, string | undefined>;
 };
+
+type TreeProps = {
+  categories: SidebarCategory[];
+  selectedSlug: string;
+  hrefFor: (slug: string) => string;
+  onPick?: () => void;
+};
+
+// Same link format as pageHref (page 1 of the category).
+function categoryLink(linkParams: Record<string, string | undefined>, slug: string) {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries({ ...linkParams, category: slug || undefined })) {
+    if (value) search.set(key, value);
+  }
+
+  const query = search.toString();
+
+  return query ? `/products?${query}` : "/products";
+}
 
 // Desktop: a collapsible tree on the left. Phones: a "Kateqoriyalar" button
 // that opens the same tree in a drawer, which closes after a pick.
-export default function CategorySidebar({ categories, selectedSlug, hrefs, allHref }: Props) {
+export default function CategorySidebar({ categories, selectedSlug, linkParams }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const hrefFor = (slug: string) => categoryLink(linkParams, slug);
 
   // Escape closes the drawer; the page behind does not scroll while open.
   useEffect(() => {
@@ -64,8 +84,7 @@ export default function CategorySidebar({ categories, selectedSlug, hrefs, allHr
           <CategoryTree
             categories={categories}
             selectedSlug={selectedSlug}
-            hrefs={hrefs}
-            allHref={allHref}
+            hrefFor={hrefFor}
           />
         </div>
       </aside>
@@ -94,8 +113,7 @@ export default function CategorySidebar({ categories, selectedSlug, hrefs, allHr
               <CategoryTree
                 categories={categories}
                 selectedSlug={selectedSlug}
-                hrefs={hrefs}
-                allHref={allHref}
+                hrefFor={hrefFor}
                 onPick={() => setDrawerOpen(false)}
               />
             </div>
@@ -106,13 +124,7 @@ export default function CategorySidebar({ categories, selectedSlug, hrefs, allHr
   );
 }
 
-function CategoryTree({
-  categories,
-  selectedSlug,
-  hrefs,
-  allHref,
-  onPick,
-}: Props & { onPick?: () => void }) {
+function CategoryTree({ categories, selectedSlug, hrefFor, onPick }: TreeProps) {
   const { childrenOf, ancestors } = useMemo(() => {
     const children = new Map<string | null, SidebarCategory[]>();
     const byId = new Map<string, SidebarCategory>();
@@ -171,7 +183,7 @@ function CategoryTree({
                   <span aria-hidden className="size-8 shrink-0" />
                 )}
                 <Link
-                  href={hrefs[category.slug] ?? allHref}
+                  href={hrefFor(category.slug)}
                   onClick={onPick}
                   aria-current={selected ? "page" : undefined}
                   className={`min-w-0 flex-1 rounded-md px-2 py-1.5 text-sm break-words ${
@@ -196,7 +208,7 @@ function CategoryTree({
   return (
     <nav aria-label="Kateqoriya ağacı" className="space-y-1">
       <Link
-        href={allHref}
+        href={hrefFor("")}
         onClick={onPick}
         aria-current={!selectedSlug ? "page" : undefined}
         className={`block rounded-md px-3 py-2 text-sm font-semibold ${

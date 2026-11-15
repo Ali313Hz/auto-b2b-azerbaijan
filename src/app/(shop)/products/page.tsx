@@ -128,11 +128,6 @@ export default async function ProductsPage({
   ]);
   const favorites = new Set<string>(favoriteIds ?? []);
 
-  // Sidebar: categories only (no products), in the admin's order.
-  const sidebarHrefs = Object.fromEntries(
-    allCategories.map((category) => [category.slug, categoryHref(category.slug)])
-  );
-
   return (
     <>
       <PageHeader
@@ -166,8 +161,9 @@ export default async function ProductsPage({
           parent_id: category.parent_id,
         }))}
         selectedSlug={selected ? selectedCategory : ""}
-        hrefs={sidebarHrefs}
-        allHref={categoryHref("")}
+        // Category links are built in the browser from these few values
+        // (sending one ready link per category made every page bigger).
+        linkParams={linkParams}
       />
 
       <div className="min-w-0">
