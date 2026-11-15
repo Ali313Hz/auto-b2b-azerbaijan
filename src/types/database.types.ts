@@ -1168,6 +1168,22 @@ export type Database = {
           order_count: number
         }[]
       }
+      get_admin_customer: {
+        Args: { p_customer_id: string }
+        Returns: {
+          active: boolean
+          archived_at: string
+          can_permanently_delete: boolean
+          company_name: string
+          contact_name: string
+          created_at: string
+          email: string
+          id: string
+          order_count: number
+          phone: string
+          price_group: Database["public"]["Enums"]["customer_price_group"]
+        }[]
+      }
       get_admin_customers: {
         Args: never
         Returns: {

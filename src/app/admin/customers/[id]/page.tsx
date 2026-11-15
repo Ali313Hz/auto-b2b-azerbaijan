@@ -51,7 +51,8 @@ export default async function AdminCustomerDetailPage({
 
   const [{ data: customers }, { data: activityRows }, { data: orders }, { data: loginRows }] =
     await Promise.all([
-      supabase.rpc("get_admin_customers"),
+      // Only this customer (not the whole customer list).
+      supabase.rpc("get_admin_customer", { p_customer_id: id }),
       // Activity numbers are aggregated in the database; only the latest
       // 20 orders are loaded.
       supabase.rpc("get_admin_customer_activity", { p_customer_id: id }),
@@ -62,7 +63,7 @@ export default async function AdminCustomerDetailPage({
         : Promise.resolve({ data: null, error: null }),
     ]);
 
-  const customer = customers?.find((item) => item.id === id);
+  const customer = customers?.[0];
 
   if (!customer) {
     notFound();
