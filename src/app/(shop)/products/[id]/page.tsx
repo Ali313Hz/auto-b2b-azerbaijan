@@ -176,7 +176,7 @@ export default async function ProductDetailPage({
                 src={video.videoUrl}
                 controls
                 playsInline
-                preload="metadata"
+                preload="none"
                 className="aspect-video w-full rounded-xl border border-zinc-800 bg-black"
               />
             ))}

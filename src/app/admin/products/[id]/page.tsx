@@ -384,7 +384,7 @@ export default async function AdminProductDetailPage({
                         src={videoUrl}
                         controls
                         playsInline
-                        preload="metadata"
+                        preload="none"
                         className="aspect-video w-full rounded bg-black"
                       />
                     ) : (
